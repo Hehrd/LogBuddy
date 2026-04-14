@@ -5,7 +5,6 @@ import com.alexander.spark.controlpanel.controller.Path;
 import com.alexander.spark.controlpanel.service.ControlPanelService;
 import com.alexander.spark.grpc.settings.GrpcSettings;
 import com.alexander.spark.ingest.IngestServiceGrpc;
-import com.alexander.spark.job.service.GrpcStubHolder;
 import com.alexander.spark.job.service.QueryScheduler;
 import com.alexander.spark.job.service.SparkService;
 import com.alexander.spark.job.service.StreamingQueryListenerService;
@@ -67,9 +66,4 @@ public class Main {
                 .build();
         return IngestServiceGrpc.newStub(channel);
     }
-
-
-
-
-
 }

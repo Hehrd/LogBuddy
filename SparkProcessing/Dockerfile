@@ -12,13 +12,13 @@ COPY src ./src
 
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q -DskipTests package && \
-    cp build/logBuddy.jar /workspace/app.jar
+    cp target/spark-processing.jar /workspace/app.jar
 
 FROM gcr.io/distroless/java21-debian12:nonroot
 
 WORKDIR /app
 
-ENV APP_PORT=8080
+ENV APP_PORT=8081
 
 COPY --from=build /workspace/app.jar /app/app.jar
 
