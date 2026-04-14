@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package ingest;
+
+// Java codegen options
+option java_multiple_files = true;
+option java_package = "com.alexander.spark.ingest";
+option java_outer_classname = "IngestProto";
+
+// Spark → microservice ingestion API
+service IngestService {
+  // Client-side streaming RPC
+  rpc ingest (stream IngestRequest) returns (IngestResponse);
+}
+
+// One record from Spark
+message IngestRequest {
+  string dsName = 1;
+  repeated LogEntry logEntries = 2;
+}
+
+// Summary sent back when the stream completes
+message IngestResponse {
+  int64 received = 1;
+}
+
+message LogEntry {
+  string plainText = 1;
+  string timestamp = 2;
+  string level = 3;
+  string message = 4;
+  string source = 5;
+  string data = 6;
+  string logger = 7;
+  map<string, string> customFields = 8;
+}
+

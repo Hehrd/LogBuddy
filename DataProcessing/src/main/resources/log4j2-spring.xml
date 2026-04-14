@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="ERROR">
+
+    <!-- ===================== -->
+    <!-- Appenders -->
+    <!-- ===================== -->
+    <Appenders>
+
+        <!-- Console appender (all logs for dev) -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss} %-5level %c{1} - %msg%n"/>
+        </Console>
+
+        <!-- App logs (your custom code) -->
+        <RollingFile name="AppFile"
+                     fileName="logs/app.log"
+                     filePattern="logs/app-%d{yyyy-MM-dd}.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %c{1} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+        </RollingFile>
+
+        <!-- Spring framework logs -->
+        <RollingFile name="SpringFile"
+                     fileName="logs/spring.log"
+                     filePattern="logs/spring-%d{yyyy-MM-dd}.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %c{1} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+        </RollingFile>
+
+        <!-- Spark + Hadoop logs -->
+        <RollingFile name="SparkFile"
+                     fileName="logs/spark.log"
+                     filePattern="logs/spark-%d{yyyy-MM-dd}.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %c{1} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+        </RollingFile>
+
+    </Appenders>
+
+    <!-- ===================== -->
+    <!-- Loggers -->
+    <!-- ===================== -->
+    <Loggers>
+
+        <!-- Custom app logs -->
+        <Logger name="com.alexander" level="DEBUG" additivity="false">
+            <AppenderRef ref="AppFile"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Spring logs -->
+        <Logger name="org.springframework" level="INFO" additivity="false">
+            <AppenderRef ref="SpringFile"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Spring async exceptions -->
+        <Logger name="org.springframework.aop.interceptor.AsyncExecutionInterceptor"
+                level="ERROR" additivity="false">
+            <AppenderRef ref="SpringFile"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Spark logs -->
+        <Logger name="org.apache.spark" level="WARN" additivity="false">
+            <AppenderRef ref="SparkFile"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Hadoop logs (usually nested under Spark) -->
+        <Logger name="org.apache.hadoop" level="WARN" additivity="false">
+            <AppenderRef ref="SparkFile"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Root logger: everything else -->
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+
+    </Loggers>
+
+</Configuration>

@@ -1,0 +1,32 @@
+# OS metadata
+.DS_Store
+
+# IDE settings
+.idea/
+*.iml
+*.ipr
+*.iws
+.gradle/
+
+# CI/config directories that should stay local
+.github/
+
+# Build output
+build/
+target/
+out/
+
+# Nested module build output
+**/build/
+**/target/
+**/out/
+
+# Logs and runtime output
+logs/
+**/logs/
+*.log
+hs_err_pid*
+replay_pid*
+
+# Java/Kotlin artifacts
+*.class
