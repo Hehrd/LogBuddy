@@ -75,6 +75,11 @@
             </exclusions>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- Spring gRPC (Client + Server Netty starter) -->
         <dependency>
             <groupId>org.springframework.grpc</groupId>
