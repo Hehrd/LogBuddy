@@ -41,7 +41,7 @@ public class GrpcWriter extends ForeachWriter<LogEntryDTO> implements Serializab
 
     @Override
     public void process(LogEntryDTO value) {
-
+        System.out.println("Processing log entry for data source: " + dsName + ", log: " + value.getPlainText());
         buffer.add(value.toLogEntry());
 
         if (buffer.size() >= grpcSettings.maxLinesPerReq()) {

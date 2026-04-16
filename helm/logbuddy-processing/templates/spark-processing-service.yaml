@@ -1,0 +1,19 @@
+{{- if .Values.sparkProcessing.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "logbuddy-processing.sparkProcessingName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: spark-processing
+spec:
+  type: {{ .Values.sparkProcessing.service.type }}
+  selector:
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: spark-processing
+  ports:
+    - name: http
+      port: {{ .Values.sparkProcessing.service.appPort }}
+      targetPort: http
+{{- end }}

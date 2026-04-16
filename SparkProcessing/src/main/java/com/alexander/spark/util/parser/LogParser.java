@@ -11,6 +11,7 @@ import org.apache.spark.sql.Row;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.Optional;
 
 public abstract class LogParser implements Serializable {
     @Getter
@@ -20,7 +21,7 @@ public abstract class LogParser implements Serializable {
         this.logType = logType;
     }
 
-    public abstract LogEntryDTO parseLog(Row log, LogFormat format);
+    public abstract LogEntryDTO parseLog(Row log, LogFormat format) throws Exception;
 
     @Data
     protected static class ParsedFields implements Serializable {

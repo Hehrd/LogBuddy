@@ -1,0 +1,55 @@
+{{- if .Values.testHadoop.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logbuddy-processing.testHadoopName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: test-hadoop
+spec:
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "logbuddy-processing.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: test-hadoop
+  template:
+    metadata:
+      labels:
+        {{- include "logbuddy-processing.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: test-hadoop
+    spec:
+      containers:
+        - name: test-hadoop
+          image: "{{ .Values.testHadoop.image.repository }}:{{ .Values.testHadoop.image.tag }}"
+          imagePullPolicy: {{ .Values.testHadoop.image.pullPolicy }}
+          env:
+            - name: SERVICE_NAME
+              value: {{ include "logbuddy-processing.testHadoopName" . | quote }}
+            - name: RPC_PORT
+              value: {{ .Values.testHadoop.service.rpcPort | quote }}
+            - name: DATA_PORT
+              value: {{ .Values.testHadoop.service.dataPort | quote }}
+            - name: HTTP_PORT
+              value: {{ .Values.testHadoop.service.httpPort | quote }}
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.testHadoop.service.rpcPort }}
+            - name: data
+              containerPort: {{ .Values.testHadoop.service.dataPort }}
+            - name: http
+              containerPort: {{ .Values.testHadoop.service.httpPort }}
+          readinessProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 20
+            periodSeconds: 10
+{{- end }}

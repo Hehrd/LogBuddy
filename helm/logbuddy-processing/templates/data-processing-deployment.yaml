@@ -1,0 +1,66 @@
+{{- if .Values.dataProcessing.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logbuddy-processing.dataProcessingName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: data-processing
+spec:
+  replicas: {{ .Values.dataProcessing.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "logbuddy-processing.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: data-processing
+  template:
+    metadata:
+      labels:
+        {{- include "logbuddy-processing.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: data-processing
+      {{- with .Values.dataProcessing.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: data-processing
+          image: "{{ .Values.dataProcessing.image.repository }}:{{ .Values.dataProcessing.image.tag }}"
+          imagePullPolicy: {{ .Values.dataProcessing.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.dataProcessing.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.dataProcessing.service.grpcPort }}
+          {{- with .Values.dataProcessing.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.config.enabled }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: {{ .Values.config.mountPath }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.config.enabled }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ required "config.existingConfigMap must be set when config.enabled=true" .Values.config.existingConfigMap }}
+      {{- end }}
+      {{- with .Values.dataProcessing.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dataProcessing.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dataProcessing.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
