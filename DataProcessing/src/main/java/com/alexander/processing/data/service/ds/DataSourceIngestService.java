@@ -51,6 +51,7 @@ public class DataSourceIngestService extends IngestServiceGrpc.IngestServiceImpl
 
         @Override
         public void onNext(IngestRequest req) {
+            System.out.println("Received ingest request for data source: " + req.getDsName() + ", log entries count: " + req.getLogEntriesCount());
             if (isSleeping.get()) {
                 return;
             }

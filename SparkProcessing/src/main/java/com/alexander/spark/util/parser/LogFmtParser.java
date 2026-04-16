@@ -3,6 +3,7 @@ package com.alexander.spark.util.parser;
 
 import com.alexander.spark.ingest.LogEntry;
 import com.alexander.spark.log.*;
+import org.apache.hadoop.shaded.org.checkerframework.checker.nullness.Opt;
 import org.apache.spark.sql.Row;
 
 import java.io.Serializable;
@@ -12,6 +13,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,20 +27,16 @@ public class LogFmtParser extends LogParser implements Serializable {
     }
 
     @Override
-    public LogEntryDTO parseLog(Row log, LogFormat format) {
+    public LogEntryDTO parseLog(Row log, LogFormat format) throws Exception {
         String logLine = log.getAs("value");
-        try {
-            validateLogLine(logLine);
-            ParsedFields parsed = extractFields(logLine, format.customFields());
-            return buildLogEntry(logLine, format, parsed);
-        } catch (Exception e) {
-            return null;
-        }
+        validateLogLine(logLine);
+        ParsedFields parsed = extractFields(logLine, format.customFields());
+        return buildLogEntry(logLine, format, parsed);
     }
 
-    private void validateLogLine(String log) {
+    private void validateLogLine(String log) throws Exception {
         if (log == null || !LOGFMT_LINE_PATTERN.matcher(log).matches()) {
-            throw new IllegalArgumentException("Invalid logfmt line");
+            throw new Exception("Invalid logfmt line");
         }
     }
 

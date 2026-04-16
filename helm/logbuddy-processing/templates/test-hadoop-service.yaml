@@ -1,0 +1,25 @@
+{{- if .Values.testHadoop.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "logbuddy-processing.testHadoopName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: test-hadoop
+spec:
+  type: {{ .Values.testHadoop.service.type }}
+  selector:
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: test-hadoop
+  ports:
+    - name: rpc
+      port: {{ .Values.testHadoop.service.rpcPort }}
+      targetPort: rpc
+    - name: data
+      port: {{ .Values.testHadoop.service.dataPort }}
+      targetPort: data
+    - name: http
+      port: {{ .Values.testHadoop.service.httpPort }}
+      targetPort: http
+{{- end }}

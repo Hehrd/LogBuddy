@@ -63,7 +63,7 @@ public class DataProcessingService {
     private void handleCheckResult(DataSource ds, String log, Rule rule, ProcessingSession processingSession) {
         RuleSession ruleSession = processingSession.getRuleSession(rule.ruleName());
         ruleSession.addLog(log);
-        if (ruleSession.getCurrentLogs().size() == rule.logTargetCount()) {
+        if (ruleSession.getCurrentLogs().size() >= rule.logTargetCount()) {
             RuleCompletion newRuleCompletion = ruleSession.toRuleCompletion(Instant.now());
             for (AlertSession alertSession : ruleSession.getAlertSessions()) {
                 alertSession.addRuleCompletion(newRuleCompletion);

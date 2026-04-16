@@ -1,0 +1,57 @@
+nameOverride: ""
+fullnameOverride: ""
+
+config:
+  enabled: true
+  mountPath: /opt/logbuddy/config
+  existingConfigMap: ""
+
+dataProcessing:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: logbuddy/data-processing
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    appPort: 6969
+    grpcPort: 9090
+  env:
+    APP_PORT: "6969"
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+sparkProcessing:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: logbuddy/spark-processing
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    appPort: 16000
+  env:
+    APP_PORT: "16000"
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+testHadoop:
+  enabled: false
+  name: test-hadoop
+  image:
+    repository: logbuddy/test-hadoop
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    rpcPort: 9000
+    dataPort: 9866
+    httpPort: 9864

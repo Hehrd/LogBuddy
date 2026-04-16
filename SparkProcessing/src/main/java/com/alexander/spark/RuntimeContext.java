@@ -79,6 +79,7 @@ public class RuntimeContext {
         SparkConf sparkConf = new SparkConf()
                 .setAppName("logbuddy")
                 .setMaster("local[*]")
+                .set("spark.scheduler.mode", "FAIR")
                 .set("spark.driver.bindAddress", "127.0.0.1")
                 .set("spark.driver.host", "127.0.0.1");
 

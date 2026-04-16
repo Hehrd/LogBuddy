@@ -1,0 +1,66 @@
+{{- if .Values.sparkProcessing.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logbuddy-processing.sparkProcessingName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: spark-processing
+spec:
+  replicas: {{ .Values.sparkProcessing.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "logbuddy-processing.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: spark-processing
+  template:
+    metadata:
+      labels:
+        {{- include "logbuddy-processing.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: spark-processing
+      {{- with .Values.sparkProcessing.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: spark-processing
+          image: "{{ .Values.sparkProcessing.image.repository }}:{{ .Values.sparkProcessing.image.tag }}"
+          imagePullPolicy: {{ .Values.sparkProcessing.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.sparkProcessing.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.sparkProcessing.service.appPort }}
+          {{- with .Values.sparkProcessing.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.config.enabled }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: {{ .Values.config.mountPath }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.config.enabled }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ required "config.existingConfigMap must be set when config.enabled=true" .Values.config.existingConfigMap }}
+      {{- end }}
+      {{- with .Values.sparkProcessing.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sparkProcessing.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sparkProcessing.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

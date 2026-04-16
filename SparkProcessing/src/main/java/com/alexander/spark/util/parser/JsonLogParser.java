@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class JsonLogParser extends LogParser implements Serializable {
 
@@ -22,22 +23,15 @@ public class JsonLogParser extends LogParser implements Serializable {
     }
 
     @Override
-    public LogEntryDTO parseLog(Row log, LogFormat logFormat) {
+    public LogEntryDTO parseLog(Row log, LogFormat logFormat) throws JsonProcessingException {
         Map<String, FieldType> customFields = logFormat.customFields();
         Map<String, String> defaultFieldValues = new HashMap<>();
         Map<String, String> customValues = new HashMap<>();
 
         JsonNode node;
         String json;
-        try {
-            // 👇 extract JSON string from "value" column
             json = log.getAs("value");
             node = JsonUtil.getJsonNode(json);
-
-        } catch (Exception e) {
-            String message = String.format("Failed to parse log row: %s", log);
-            return null;
-        }
 
         node.fieldNames().forEachRemaining(fieldName -> {
             if (!customFields.containsKey(fieldName)) {

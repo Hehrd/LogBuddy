@@ -14,13 +14,17 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q -DskipTests package && \
     cp target/spark-processing.jar /workspace/app.jar
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-ENV APP_PORT=8081
+ENV APP_PORT=16000
 
 COPY --from=build /workspace/app.jar /app/app.jar
+
+RUN addgroup -S app && adduser -S -G app app && chown -R app:app /app
+
+USER app
 
 EXPOSE ${APP_PORT}
 
