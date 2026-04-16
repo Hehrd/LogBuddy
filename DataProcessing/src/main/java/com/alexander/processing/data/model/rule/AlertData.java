@@ -1,7 +1,5 @@
 package com.alexander.processing.data.model.rule;
 
-import lombok.AllArgsConstructor;
-
 import java.util.List;
 
 public record AlertData(String alertName, List<String> requiredRules, Long timeWindowMillis,
