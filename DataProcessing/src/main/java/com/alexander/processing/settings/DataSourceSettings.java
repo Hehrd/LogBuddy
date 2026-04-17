@@ -1,6 +1,6 @@
 package com.alexander.processing.settings;
 
-import com.alexander.processing.data.model.ds.DataSource;
+import com.alexander.processing.model.ds.DataSource;
 import lombok.AllArgsConstructor;
 
 import java.util.Map;

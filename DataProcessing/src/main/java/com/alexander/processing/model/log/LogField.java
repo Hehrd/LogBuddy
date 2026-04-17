@@ -1,0 +1,15 @@
+package com.alexander.processing.model.log;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class LogField {
+    private String fieldName;
+    private String fieldValue;
+    private FieldType fieldType;
+
+}
