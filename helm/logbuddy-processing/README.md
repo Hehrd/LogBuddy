@@ -1,11 +1,13 @@
 # LogBuddy processing Helm chart
 
-This chart deploys the `data-processing` and `spark-processing` services from `compose.yaml` to Kubernetes.
+This chart deploys the `data-processing`, `spark-processing`, and `ai-analyze` services to Kubernetes.
 
 ## What it creates
 
 - One `Deployment` and `Service` for `data-processing`
 - One `Deployment` and `Service` for `spark-processing`
+- One `Deployment` and `Service` for `ai-analyze`
+- One `Ollama` sidecar container in the `ai-analyze` pod that preloads the configured model
 - One client-provided `ConfigMap` mounted at `/opt/logbuddy/config`
 
 ## Configure images
@@ -19,7 +21,9 @@ helm upgrade --install logbuddy-processing ./helm/logbuddy-processing \
   --set dataProcessing.image.repository=your-registry/logbuddy-data-processing \
   --set dataProcessing.image.tag=your-tag \
   --set sparkProcessing.image.repository=your-registry/logbuddy-spark-processing \
-  --set sparkProcessing.image.tag=your-tag
+  --set sparkProcessing.image.tag=your-tag \
+  --set aiAnalyze.image.repository=your-registry/logbuddy-ai-analyze \
+  --set aiAnalyze.image.tag=your-tag
 ```
 
 ## Configure shared files

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: logbuddy-processing
-description: Helm chart for the LogBuddy data-processing and spark-processing services
+description: Helm chart for the LogBuddy data-processing, spark-processing, and ai-analyze services
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

@@ -37,6 +37,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-spark-processing" (include "logbuddy-processing.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "logbuddy-processing.aiAnalyzeName" -}}
+{{- printf "%s-ai-analyze" (include "logbuddy-processing.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "logbuddy-processing.testHadoopName" -}}
 {{- printf "%s-%s" (include "logbuddy-processing.fullname" .) .Values.testHadoop.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

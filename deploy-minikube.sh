@@ -3,9 +3,10 @@ set -euo pipefail
 
 # --------------------------------------------------
 # Minimal LogBuddy Minikube Deployment Script
-# Deploys ONLY:
+# Deploys:
 # - data-processing
 # - spark-processing
+# - ai-analyze
 # --------------------------------------------------
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,9 +19,23 @@ HELM_CHART_PATH="${HELM_CHART_PATH:-$ROOT_DIR/helm/logbuddy-processing}"
 
 DATA_IMAGE="${DATA_IMAGE:-logbuddy/data-processing:latest}"
 SPARK_IMAGE="${SPARK_IMAGE:-logbuddy/spark-processing:latest}"
+AI_ANALYZE_IMAGE="${AI_ANALYZE_IMAGE:-logbuddy/ai-analyze:latest}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
+}
+
+delete_deployment_and_wait() {
+  local deployment_name="$1"
+  local app_name="$2"
+
+  kubectl delete deployment "$deployment_name" -n "$NAMESPACE" --ignore-not-found
+  kubectl wait --for=delete deployment/"$deployment_name" -n "$NAMESPACE" --timeout=120s >/dev/null 2>&1 || true
+  kubectl wait \
+    --for=delete pod \
+    -l "app.kubernetes.io/instance=$RELEASE_NAME,app.kubernetes.io/name=$app_name,app.kubernetes.io/part-of=logbuddy-processing" \
+    -n "$NAMESPACE" \
+    --timeout=180s >/dev/null 2>&1 || true
 }
 
 require_cmd() {
@@ -49,8 +64,10 @@ minikube -p "$MINIKUBE_PROFILE" update-context
 log "Switching Docker client to Minikube daemon"
 eval "$(minikube -p "$MINIKUBE_PROFILE" docker-env)"
 
-kubectl delete deployment logbuddy-processing-data-processing
-kubectl delete deployment logbuddy-processing-spark-processing
+log "Cleaning up previous deployments if they exist"
+delete_deployment_and_wait "$RELEASE_NAME"-data-processing data-processing
+delete_deployment_and_wait "$RELEASE_NAME"-spark-processing spark-processing
+delete_deployment_and_wait "$RELEASE_NAME"-ai-analyze ai-analyze
 
 # --------------------------------------------------
 # Force refresh ConfigMap
@@ -74,6 +91,9 @@ docker build -t "$DATA_IMAGE" "$ROOT_DIR/DataProcessing"
 log "Building spark-processing image"
 docker build -t "$SPARK_IMAGE" "$ROOT_DIR/SparkProcessing"
 
+log "Building ai-analyze image"
+docker build -t "$AI_ANALYZE_IMAGE" "$ROOT_DIR/ai_analyze"
+
 # --------------------------------------------------
 # Deploy Helm Release
 # --------------------------------------------------
@@ -82,23 +102,22 @@ log "Deploying Helm release"
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_PATH" \
   --namespace "$NAMESPACE" \
   --create-namespace \
-  --set "config.existingConfigMap=$CONFIGMAP_NAME"
-
-# --------------------------------------------------
-# Restart Deployments
-# --------------------------------------------------
-
-log "Restarting deployments"
-kubectl rollout restart deployment/"$RELEASE_NAME"-data-processing -n "$NAMESPACE"
-kubectl rollout restart deployment/"$RELEASE_NAME"-spark-processing -n "$NAMESPACE"
+  --set "config.existingConfigMap=$CONFIGMAP_NAME" \
+  --set "dataProcessing.image.repository=${DATA_IMAGE%:*}" \
+  --set "dataProcessing.image.tag=${DATA_IMAGE##*:}" \
+  --set "sparkProcessing.image.repository=${SPARK_IMAGE%:*}" \
+  --set "sparkProcessing.image.tag=${SPARK_IMAGE##*:}" \
+  --set "aiAnalyze.image.repository=${AI_ANALYZE_IMAGE%:*}" \
+  --set "aiAnalyze.image.tag=${AI_ANALYZE_IMAGE##*:}"
 
 # --------------------------------------------------
 # Wait for Rollouts
 # --------------------------------------------------
 
-log "Waiting for rollouts"
+log "Waiting for Helm-managed rollouts"
 kubectl rollout status deployment/"$RELEASE_NAME"-data-processing -n "$NAMESPACE" --timeout=120s
 kubectl rollout status deployment/"$RELEASE_NAME"-spark-processing -n "$NAMESPACE" --timeout=120s
+kubectl rollout status deployment/"$RELEASE_NAME"-ai-analyze -n "$NAMESPACE" --timeout=120s
 
 # --------------------------------------------------
 # Status + Logs
@@ -112,3 +131,6 @@ kubectl logs deployment/"$RELEASE_NAME"-data-processing -n "$NAMESPACE" --since=
 
 log "Recent spark-processing logs"
 kubectl logs deployment/"$RELEASE_NAME"-spark-processing -n "$NAMESPACE" --since=2m || true
+
+log "Recent ai-analyze logs"
+kubectl logs deployment/"$RELEASE_NAME"-ai-analyze -n "$NAMESPACE" --since=2m || true

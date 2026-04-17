@@ -1,0 +1,19 @@
+{{- if .Values.aiAnalyze.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "logbuddy-processing.aiAnalyzeName" . }}
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ai-analyze
+spec:
+  type: {{ .Values.aiAnalyze.service.type }}
+  selector:
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ai-analyze
+  ports:
+    - name: http
+      port: {{ .Values.aiAnalyze.service.appPort }}
+      targetPort: http
+{{- end }}

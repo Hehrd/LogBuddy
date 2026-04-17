@@ -3,6 +3,8 @@
    - dataProcessing.image.tag
    - sparkProcessing.image.repository
    - sparkProcessing.image.tag
+   - aiAnalyze.image.repository
+   - aiAnalyze.image.tag
 
 2. Create a client-owned ConfigMap with:
    - app.conf
@@ -14,6 +16,7 @@
 3. Access the services inside the cluster:
    - Data processing gRPC: {{ include "logbuddy-processing.dataProcessingName" . }}:{{ .Values.dataProcessing.service.appPort }}
    - Spark processing: {{ include "logbuddy-processing.sparkProcessingName" . }}:{{ .Values.sparkProcessing.service.appPort }}
+   - AI analyze: {{ include "logbuddy-processing.aiAnalyzeName" . }}:{{ .Values.aiAnalyze.service.appPort }}
 {{- if .Values.testHadoop.enabled }}
    - Test Hadoop RPC: {{ include "logbuddy-processing.testHadoopName" . }}:{{ .Values.testHadoop.service.rpcPort }}
 {{- end }}

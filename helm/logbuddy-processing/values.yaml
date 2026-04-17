@@ -43,6 +43,36 @@ sparkProcessing:
   tolerations: []
   affinity: {}
 
+aiAnalyze:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: logbuddy/ai-analyze
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    appPort: 8000
+  env:
+    APP_PORT: "8000"
+    OLLAMA_BASE_URL: "http://127.0.0.1:11434"
+    OLLAMA_MODEL: "llama3.1"
+    OLLAMA_TIMEOUT_SECONDS: "60"
+  ollama:
+    enabled: true
+    model: llama3.1
+    image:
+      repository: ollama/ollama
+      tag: latest
+      pullPolicy: IfNotPresent
+    port: 11434
+    resources: {}
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 testHadoop:
   enabled: false
   name: test-hadoop
