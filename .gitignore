@@ -1,4 +1,9 @@
 .env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 # OS metadata
 .DS_Store
 
@@ -33,6 +38,7 @@ replay_pid*
 *.class
 
 # JavaScript / Vite frontend
+Frontend/.env
 node_modules/
 **/node_modules/
 dist/
