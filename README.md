@@ -140,13 +140,13 @@ Observed issues:
 - `DataProcessing/src/main/resources/application.properties`
 - `DataProcessing/src/main/proto/ingest.proto`
 - `DataProcessing/src/main/java/com/alexander/processing/Main.java`
-- `DataProcessing/src/main/java/com/alexander/processing/ProcessingContext.java`
-- `DataProcessing/src/main/java/com/alexander/processing/controller/ControlPanelController.java`
-- `DataProcessing/src/main/java/com/alexander/processing/data/config/AppSettingsConfig.java`
-- `DataProcessing/src/main/java/com/alexander/processing/data/service/ds/DataSourceIngestService.java`
-- `DataProcessing/src/main/java/com/alexander/processing/data/service/ds/DataProcessingService.java`
-- `DataProcessing/src/main/java/com/alexander/processing/data/service/rule/RuleProcessingService.java`
-- `DataProcessing/src/main/java/com/alexander/processing/data/service/alert/AlertingService.java`
+- `DataProcessing/src/main/java/com/alexander/processing/context/ProcessingContext.java`
+- `DataProcessing/src/main/java/com/alexander/processing/controlpanel/controller/ControlPanelController.java`
+- `DataProcessing/src/main/java/com/alexander/processing/config/AppSettingsConfig.java`
+- `DataProcessing/src/main/java/com/alexander/processing/service/ds/DataSourceIngestService.java`
+- `DataProcessing/src/main/java/com/alexander/processing/service/ds/DataProcessingService.java`
+- `DataProcessing/src/main/java/com/alexander/processing/service/rule/RuleProcessingService.java`
+- `DataProcessing/src/main/java/com/alexander/processing/service/alert/AlertingService.java`
 
 #### API endpoints
 
@@ -229,12 +229,12 @@ It also starts a small embedded HTTP server for runtime controls such as reloadi
 
 - `SparkProcessing/pom.xml`
 - `SparkProcessing/src/main/java/com/alexander/spark/Main.java`
-- `SparkProcessing/src/main/java/com/alexander/spark/RuntimeContext.java`
+- `SparkProcessing/src/main/java/com/alexander/spark/context/RuntimeContext.java`
 - `SparkProcessing/src/main/java/com/alexander/spark/controlpanel/controller/ControlPanelController.java`
 - `SparkProcessing/src/main/java/com/alexander/spark/controlpanel/service/ControlPanelService.java`
-- `SparkProcessing/src/main/java/com/alexander/spark/job/service/SparkService.java`
-- `SparkProcessing/src/main/java/com/alexander/spark/job/service/QueryScheduler.java`
-- `SparkProcessing/src/main/java/com/alexander/spark/job/service/GrpcWriter.java`
+- `SparkProcessing/src/main/java/com/alexander/spark/query/service/SparkService.java`
+- `SparkProcessing/src/main/java/com/alexander/spark/query/service/QueryScheduler.java`
+- `SparkProcessing/src/main/java/com/alexander/spark/query/service/GrpcWriter.java`
 - `SparkProcessing/src/main/proto/ingest.proto`
 
 #### API endpoints
@@ -373,19 +373,21 @@ There are no sample config files in the repository, so this example is inferred 
 {
   "serverPort": 8081,
   "controlPanelServerPort": 8080,
+  "isInK8sMode": false,
   "grpcSettings": {
     "serverHost": "localhost",
     "serverPort": 9090,
     "maxLinesPerReq": 100
-  }
+  },
+  "sparkK8sSettings": null
 }
 ```
 
 Notes:
 
-- `SparkProcessing` appears to use `serverPort`.
-- `DataProcessing` appears to use `controlPanelServerPort` and `grpcSettings`.
-- Sharing one file between both services may require both fields to be present.
+- `SparkProcessing` consumes `serverPort`, `grpcSettings`, `isInK8sMode`, and `sparkK8sSettings`.
+- `DataProcessing` consumes `controlPanelServerPort` and `grpcSettings`.
+- Both services disable Jackson's unknown-property failures, so a shared `app.conf` can contain the union of both models.
 
 #### Example `ds.conf`
 
@@ -436,6 +438,12 @@ Notes:
 }
 ```
 
+Notes:
+
+- `SparkProcessing` reads `pathInfo`.
+- `DataProcessing` reads `path`.
+- Because both services ignore unknown JSON properties, one shared `ds.conf` can carry both fields.
+
 #### Example `rule.conf`
 
 ```json
@@ -444,6 +452,7 @@ Notes:
     "error-level-rule": {
       "ruleName": "error-level-rule",
       "check": {
+        "type": "log_level_check",
         "level": "ERROR"
       },
       "logTargetCount": 1,
@@ -453,9 +462,12 @@ Notes:
 }
 ```
 
-Important caveat:
+The `check.type` discriminator values defined in code are:
 
-- The exact JSON polymorphism for `check` objects is not obvious from the code alone. The repository defines the check classes, but there is no sample configuration showing how Jackson distinguishes between `LogLevelCheck`, `TimestampCheck`, `MessageLengthCheck`, and `DataRegexMatchCheck`.
+- `log_level_check`
+- `data_regex_match_check`
+- `message_length_check`
+- `timestamp_check`
 
 ### How to run each service
 
@@ -596,7 +608,7 @@ Expected behavior:
 
 - The project title should remain `LogBuddy`, based on the root README, package names, Spark app name, and config paths.
 - `ControlPanel` is intended to be a Spring Boot API gateway, even though its bootstrap class is unfinished.
-- `DataProcessing` REST API likely runs on Spring Boot default port `8080` unless overridden elsewhere.
+- `DataProcessing` REST API likely runs on Spring Boot default port `8080` unless `server.port` is supplied externally.
 - `SparkProcessing` runs its HTTP API on `app.conf.serverPort`.
 - Config files are JSON, even though they use `.conf` extensions.
 
@@ -606,8 +618,7 @@ Expected behavior:
 - `ControlPanel` endpoint names do not match the endpoint names implemented by `SparkProcessing`.
 - `SparkProcessing` controller path matching uses `getRequestURI().getHost()` in a way that may not behave as intended.
 - `DataProcessing` has `controlPanelServerPort` in config, but its REST server port is not directly wired from that field in the visible code.
-- `DataSource.path` exists in `DataProcessing` but `SparkProcessing` uses `pathInfo` instead; this suggests the two services may expect slightly different config models.
-- `rule.conf` polymorphic deserialization format for the `check` field is not obvious without example config.
+- `DataSource.path` exists in `DataProcessing` while `SparkProcessing` uses `pathInfo`; the current setup relies on both services ignoring unknown JSON properties so one file can contain both shapes.
 - `DataProcessing/Dockerfile` looks inconsistent:
   - it copies `build/logBuddyProcessing-exec.jar`
   - it exposes port `6969`
@@ -637,12 +648,12 @@ LogBuddy/
 |   |-- pom.xml
 |   |-- Dockerfile
 |   |-- src/main/java/com/alexander/processing/
-|   |   |-- controller/
-|   |   |-- data/
-|   |   |   |-- config/
-|   |   |   |-- model/
-|   |   |   `-- service/
-|   |   |-- error/
+|   |   |-- config/
+|   |   |-- context/
+|   |   |-- controlpanel/
+|   |   |-- exception/
+|   |   |-- model/
+|   |   |-- service/
 |   |   |-- settings/
 |   |   `-- util/
 |   |-- src/main/proto/
@@ -651,10 +662,11 @@ LogBuddy/
 |   |-- pom.xml
 |   |-- src/main/java/com/alexander/spark/
 |   |   |-- controlpanel/
+|   |   |-- context/
 |   |   |-- ds/
-|   |   |-- grpc/
-|   |   |-- job/
+|   |   |-- exception/
 |   |   |-- log/
+|   |   |-- query/
 |   |   |-- settings/
 |   |   `-- util/
 |   |-- src/main/proto/

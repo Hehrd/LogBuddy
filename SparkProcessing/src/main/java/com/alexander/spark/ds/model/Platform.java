@@ -1,6 +1,6 @@
 package com.alexander.spark.ds.model;
 
-import com.alexander.spark.job.service.stream.connector.*;
+import com.alexander.spark.ds.connector.*;
 
 public enum Platform {
 

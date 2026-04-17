@@ -1,6 +1,6 @@
 package com.alexander.processing.settings;
 
-import com.alexander.processing.data.model.rule.Rule;
+import com.alexander.processing.model.rule.Rule;
 import lombok.AllArgsConstructor;
 
 import java.util.Map;
