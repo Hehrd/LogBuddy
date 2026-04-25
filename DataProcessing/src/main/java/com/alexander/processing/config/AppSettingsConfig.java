@@ -19,51 +19,49 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executor;
 
 @Configuration
 public class AppSettingsConfig {
     private static final Logger log = LoggerFactory.getLogger(AppSettingsConfig.class);
+    private static final String DS_CONFIG_PATH = "ds.conf";
+    private static final String RULE_CONFIG_PATH = "rule.conf";
+    private static final String APP_CONFIG_PATH = "app.conf";
 
     @Bean
-    public AppSettings appSettings(@Value("${config.path.ds}") String dsConfigPathString,
-                                   @Value("${config.path.rule}") String ruleConfigPathString,
-                                   @Value("${config.path.app}") String appConfigPathString)  {
-        Map<String, TypeReference> deserializationTypes = Map.of(
-                dsConfigPathString, new TypeReference<DataSourceSettings>() {},
-                ruleConfigPathString, new TypeReference<RuleSettings>() {},
-                appConfigPathString, new TypeReference<AppConfigurationSettings>() {});
+    public AppSettings appSettings(@Value("${config.path}") String configPath) {
+        Path basePath = Path.of(configPath);
+        Path appConfigPath = basePath.resolve(APP_CONFIG_PATH);
+        Path dataSourceConfigPath = basePath.resolve(DS_CONFIG_PATH);
+        Path ruleConfigPath = basePath.resolve(RULE_CONFIG_PATH);
 
-        List<String> paths = List.of(dsConfigPathString, ruleConfigPathString, appConfigPathString);
-        Path currentPath = null;
-        Map<String, Object> values = new HashMap<>();
         try {
-            for (String pathString : paths) {
-                currentPath = Paths.get(pathString);
-                log.info("Loading configuration from {}", currentPath);
-                Object obj = readConfig(currentPath, deserializationTypes.get(pathString));
-                values.put(pathString, obj);
-            }
+            log.info("Loading configuration from {}", appConfigPath);
+            AppConfigurationSettings appConfigurationSettings =
+                    readConfig(appConfigPath, new TypeReference<AppConfigurationSettings>() {});
+
+            log.info("Loading configuration from {}", dataSourceConfigPath);
+            DataSourceSettings dataSourceSettings =
+                    readConfig(dataSourceConfigPath, new TypeReference<DataSourceSettings>() {});
+
+            log.info("Loading configuration from {}", ruleConfigPath);
+            RuleSettings ruleSettings =
+                    readConfig(ruleConfigPath, new TypeReference<RuleSettings>() {});
+
+            log.info("Configuration loaded successfully");
+            return new AppSettings(appConfigurationSettings, dataSourceSettings, ruleSettings);
         } catch (JsonProcessingException e) {
             String message = String.format("Could not deserialize config file from %s, error at %s:%s",
-                    currentPath.toString(), e.getLocation().getLineNr(), e.getLocation().getCharOffset());
+                    e.getLocation() == null ? "unknown" : e.getLocation().sourceDescription(),
+                    e.getLocation() == null ? "unknown" : e.getLocation().getLineNr(),
+                    e.getLocation() == null ? "unknown" : e.getLocation().getCharOffset());
             throw new InvalidDataSourceConfigFormatException(message, e);
         } catch (IOException e) {
-            String message = String.format("Could not find config file from: %s", currentPath.toString());
+            String message = String.format("Could not read config file from: %s", e.getMessage());
             throw new DataSourceConfigNotFoundException(message, e);
         }
-
-        AppSettings appSettings = new  AppSettings((AppConfigurationSettings) values.get(appConfigPathString),
-                (DataSourceSettings) values.get(dsConfigPathString),
-                (RuleSettings) values.get(ruleConfigPathString));
-        log.info("Configuration loaded successfully");
-        return appSettings;
     }
 
     @Bean(name = "dataProcessingExecutor")
@@ -85,13 +83,8 @@ public class AppSettingsConfig {
     public Clock clock() {
         return Clock.system(ZoneId.systemDefault());
     }
-
-
-
-
-    private Object readConfig(Path path, TypeReference deserializationType) throws IOException {
+    private <T> T readConfig(Path path, TypeReference<T> deserializationType) throws IOException {
         String json = Files.readString(path);
-        Object obj = JsonUtil.deserialize(json, deserializationType);
-        return obj;
+        return JsonUtil.deserialize(json, deserializationType);
     }
 }
