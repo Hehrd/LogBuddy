@@ -5,13 +5,14 @@ import com.alexander.processing.exception.runtime.AlertPublishingException;
 import com.alexander.processing.model.alert.Alert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.net.URI;
 import java.util.List;
 
 
@@ -31,10 +32,10 @@ public class AlertingService {
     }
 
     public void sendAlert(List<String> endpoints, Alert alert) {
-    if (alert.aiOverviewEnabled()) {
-        redirectToAIAnalyzer(alert, endpoints);
-        return;
-    }
+        if (alert.aiOverviewEnabled()) {
+            redirectToAIAnalyzer(alert, endpoints);
+            return;
+        }
         for (String endpoint : endpoints) {
             webClient.post()
                     .uri(endpoint)
@@ -48,14 +49,29 @@ public class AlertingService {
     }
 
     private void redirectToAIAnalyzer(Alert alert, List<String> endpoints) {
+        String uri = buildAiAnalyzerUri();
         webClient.post()
-                .uri(aiAnalyzerHost + "/analyze")
+                .uri(uri)
                 .bodyValue(new AiAnalyzerRequest(alert, endpoints))
                 .retrieve()
-                .toBodilessEntity()
-                .doOnError(e -> log.error("Failed to send alert to AI analyzer: {}", e.getMessage()))
-                .subscribe();
+                .bodyToMono(AiAnalyzerResponse.class)
+                .doOnNext(response -> pushAlertToDashboard(response.alert()))
+                .doOnError(WebClientResponseException.class, e ->
+                        log.error("AI analyzer request failed with status {} and body {}",
+                                e.getStatusCode(), e.getResponseBodyAsString()))
+                .doOnError(e -> log.error("Failed to send alert to AI analyzer: {}", e.getMessage(), e))
+                .block();
+    }
 
+    private String buildAiAnalyzerUri() {
+        String baseHost = aiAnalyzerHost == null ? "" : aiAnalyzerHost.trim();
+        if (!baseHost.startsWith("http://") && !baseHost.startsWith("https://")) {
+            baseHost = "http://" + baseHost;
+        }
+
+        return URI.create(baseHost)
+                .resolve("/api/v1/log-analysis")
+                .toString();
     }
 
     private void pushAlertToDashboard(Alert alert) {
@@ -68,21 +84,9 @@ public class AlertingService {
         }
     }
 
-    private class AiAnalyzerRequest {
-        private final Alert alert;
-        private final List<String> endpoints;
+    private record AiAnalyzerRequest(Alert alert, List<String> endpoints) {
+    }
 
-        public AiAnalyzerRequest(Alert alert, List<String> endpoints) {
-            this.alert = alert;
-            this.endpoints = endpoints;
-        }
-
-        public Alert getAlert() {
-            return alert;
-        }
-
-        public List<String> getEndpoints() {
-            return endpoints;
-        }
+    private record AiAnalyzerResponse(Alert alert) {
     }
 }

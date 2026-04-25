@@ -24,7 +24,7 @@ class EnrichedAlert(BaseModel):
     alertName: str
     alertType: str
     dataSourceName: str
-    traceId: str
+    traceId: str | None = None
     triggeredAt: datetime
     firstMatchedAt: datetime
     lastMatchedAt: datetime

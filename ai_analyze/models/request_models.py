@@ -14,7 +14,7 @@ class Alert(BaseModel):
     alertName: str = Field(..., min_length=1)
     alertType: str = Field(..., min_length=1)
     dataSourceName: str = Field(..., min_length=1)
-    traceId: str = Field(..., min_length=1)
+    traceId: str | None = None
     triggeredAt: datetime
     firstMatchedAt: datetime
     lastMatchedAt: datetime

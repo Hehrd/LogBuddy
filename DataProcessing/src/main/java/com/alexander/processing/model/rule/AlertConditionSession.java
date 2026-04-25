@@ -63,7 +63,8 @@ public class AlertConditionSession {
                 alertCondition.requiredRules(),
                 completions,
                 sampleLogs,
-                alertCondition.aiOverviewEnabled()
+                alertCondition.aiOverviewEnabled(),
+                null
         );
     }
 
