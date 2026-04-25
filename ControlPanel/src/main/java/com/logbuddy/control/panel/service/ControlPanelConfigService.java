@@ -42,19 +42,16 @@ public class ControlPanelConfigService {
         return readConfig(RULE_CONFIG_PATH, ControlPanelRuleConfig.class);
     }
 
-    public Map<String, Object> dataSourcesView() {
+    public Map<String, ControlPanelDataSourceConfig.ControlPanelDataSourceEntry> dataSourcesView() {
         ControlPanelDataSourceConfig config = dataSourceConfig();
         log.debug("Loaded {} data sources from local config files", config.dataSources().size());
-        return Map.of(
-                "dataSources", config.dataSources().keySet(),
-                "logTraceSessionTimeoutMillis", config.logTraceSessionTimeoutMillis()
-        );
+        return config.dataSources();
     }
 
-    public Map<String, Object> rulesView() {
+    public Map<String, ControlPanelRuleConfig.ControlPanelRuleEntry> rulesView() {
         ControlPanelRuleConfig config = ruleConfig();
         log.debug("Loaded {} rules from local config files", config.rules().size());
-        return Map.of("rules", config.rules().keySet());
+        return config.rules();
     }
 
     private <T> T readConfig(String relativePath, Class<T> clazz) {
