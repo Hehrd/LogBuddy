@@ -64,6 +64,15 @@ function getRuleNames(alert) {
               {{ alert.severity }}
             </span>
           </div>
+          <div class="mt-2 grid gap-1 text-xs text-slate-500">
+            <p><span class="font-semibold text-slate-700">Id:</span> {{ alert.id }}</p>
+            <p><span class="font-semibold text-slate-700">Source:</span> {{ alert.sourceName ?? 'Unknown' }}</p>
+            <p><span class="font-semibold text-slate-700">Type:</span> {{ alert.alertType ?? 'Unknown' }}</p>
+            <p><span class="font-semibold text-slate-700">Triggered:</span> {{ alert.occurredAt ?? 'Unknown' }}</p>
+            <p v-if="alert.traceId"><span class="font-semibold text-slate-700">Trace:</span> {{ alert.traceId }}</p>
+            <p v-if="alert.timeWindowMillis"><span class="font-semibold text-slate-700">Window:</span> {{ alert.timeWindowMillis }} ms</p>
+            <p><span class="font-semibold text-slate-700">AI overview:</span> {{ alert.aiOverviewEnabled ? 'enabled' : 'disabled' }}</p>
+          </div>
           <p class="mt-1 text-sm text-slate-600">{{ alert.message }}</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <span
@@ -75,6 +84,11 @@ function getRuleNames(alert) {
               {{ ruleName }}
             </span>
           </div>
+          <div v-if="alert.firstMatchedAt || alert.lastMatchedAt" class="mt-2 grid gap-1 text-xs text-slate-500">
+            <p v-if="alert.firstMatchedAt"><span class="font-semibold text-slate-700">First matched:</span> {{ alert.firstMatchedAt }}</p>
+            <p v-if="alert.lastMatchedAt"><span class="font-semibold text-slate-700">Last matched:</span> {{ alert.lastMatchedAt }}</p>
+          </div>
+          <pre v-if="alert.sampleLogs?.length" class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ alert.sampleLogs }}</pre>
         </article>
       </div>
 

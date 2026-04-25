@@ -2,11 +2,29 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import AlertNotifications from './components/AlertNotifications.vue'
+import ControlPlanePanel from './components/ControlPlanePanel.vue'
 import HealthStatusCard from './components/HealthStatusCard.vue'
-import { MockAlertWebSocket } from './mocks/mockAlertWebSocket.js'
 import { normalizeAlert } from './services/alertFormatter.js'
-import { createAlertsSocket, getDefaultAlertsSocketUrl } from './services/alertsSocket.js'
-import { fetchHealth } from './services/backendApi.js'
+import { createAlertsConnection } from './services/alertsService.js'
+import { formatApiError } from './services/httpClient.js'
+import {
+  fetchControlPlaneConfig,
+  fetchControlPlaneDataSources,
+  fetchControlPlaneRules,
+  fetchControlPlaneStreamMetrics,
+  fetchControlPlaneStatus,
+  fetchHealth,
+  fetchSparkQueries,
+  restartSparkQueriesAction,
+  runControlPlaneAction,
+  runSparkQueryAction,
+} from './services/backendApi.js'
+
+function extractQueryNames(queriesPayload) {
+  if (Array.isArray(queriesPayload)) return queriesPayload
+  if (Array.isArray(queriesPayload?.queries)) return queriesPayload.queries
+  return Object.keys(queriesPayload ?? {})
+}
 
 const notificationSocket = ref(null)
 const notificationAlerts = ref([])
@@ -14,6 +32,36 @@ const notificationsOpen = ref(false)
 const health = ref(null)
 const healthLoading = ref(true)
 const healthError = ref('')
+const controlPlaneServices = ref([
+  {
+    key: 'data-processing',
+    label: 'Data Processing',
+    loading: false,
+    error: '',
+    status: null,
+    config: null,
+    dataSources: null,
+    rules: null,
+    actions: ['sleep', 'wake', 'restart', 'shutdown'],
+    queries: null,
+    queryNames: [],
+    streamMetrics: null,
+  },
+  {
+    key: 'spark',
+    label: 'Spark Processing',
+    loading: false,
+    error: '',
+    status: null,
+    config: null,
+    dataSources: null,
+    rules: null,
+    actions: ['sleep', 'wake', 'restart', 'shutdown'],
+    queries: null,
+    queryNames: [],
+    streamMetrics: null,
+  },
+])
 
 const alertsMode = computed(() => {
   const mode = import.meta.env.VITE_ALERTS_MODE?.toLowerCase()
@@ -23,12 +71,6 @@ const alertsMode = computed(() => {
   return import.meta.env.DEV ? 'mock' : 'real'
 })
 
-const useMockAlerts = computed(() => alertsMode.value === 'mock')
-
-const alertsSocketUrl = computed(() => {
-  return import.meta.env.VITE_ALERTS_WS_URL ?? getDefaultAlertsSocketUrl()
-})
-
 async function loadHealth() {
   healthLoading.value = true
   healthError.value = ''
@@ -36,25 +78,112 @@ async function loadHealth() {
   try {
     health.value = await fetchHealth()
   } catch (error) {
-    healthError.value = error.message ?? 'Health check failed'
+    healthError.value = formatApiError(error, 'Health check failed.')
   } finally {
     healthLoading.value = false
   }
 }
 
-function connectNotificationSocket() {
-  notificationSocket.value?.close()
+function getServiceState(serviceKey) {
+  return controlPlaneServices.value.find((service) => service.key === serviceKey)
+}
 
-  notificationSocket.value = createAlertsSocket({
-    url: alertsSocketUrl.value,
-    WebSocketImpl: useMockAlerts.value ? MockAlertWebSocket : window.WebSocket,
+async function refreshControlPlaneService(serviceKey) {
+  const service = getServiceState(serviceKey)
+  if (!service) return
+
+  service.loading = true
+  service.error = ''
+
+  try {
+    service.status = await fetchControlPlaneStatus(serviceKey)
+    service.config = await fetchControlPlaneConfig(serviceKey)
+    service.dataSources = await fetchControlPlaneDataSources(serviceKey)
+    service.rules = await fetchControlPlaneRules(serviceKey)
+
+    if (serviceKey === 'data-processing') {
+      service.streamMetrics = await fetchControlPlaneStreamMetrics()
+    }
+
+    if (serviceKey === 'spark') {
+      service.queries = await fetchSparkQueries()
+      service.queryNames = extractQueryNames(service.queries)
+    }
+  } catch (error) {
+    service.error = formatApiError(error, `Failed to refresh ${service.label}.`)
+  } finally {
+    service.loading = false
+  }
+}
+
+async function runServiceAction(serviceKey, action) {
+  const service = getServiceState(serviceKey)
+  if (!service) return
+
+  service.error = ''
+
+  try {
+    await runControlPlaneAction(serviceKey, action)
+    await refreshControlPlaneService(serviceKey)
+    await loadHealth()
+  } catch (error) {
+    service.error = formatApiError(error, `Failed to run ${action} on ${service.label}.`)
+  }
+}
+
+async function startSparkQuery(dataSource) {
+  const service = getServiceState('spark')
+  if (!service) return
+
+  try {
+    await runSparkQueryAction(dataSource, 'start')
+    await refreshControlPlaneService('spark')
+  } catch (error) {
+    service.error = formatApiError(error, `Failed to start query ${dataSource}.`)
+  }
+}
+
+async function stopSparkQuery(dataSource) {
+  const service = getServiceState('spark')
+  if (!service) return
+
+  try {
+    await runSparkQueryAction(dataSource, 'stop')
+    await refreshControlPlaneService('spark')
+  } catch (error) {
+    service.error = formatApiError(error, `Failed to stop query ${dataSource}.`)
+  }
+}
+
+async function restartSparkQueries() {
+  const service = getServiceState('spark')
+  if (!service) return
+
+  service.error = ''
+
+  try {
+    await restartSparkQueriesAction()
+    await refreshControlPlaneService('spark')
+  } catch (error) {
+    service.error = formatApiError(error, 'Failed to restart Spark queries.')
+  }
+}
+
+function connectNotificationSocket() {
+  notificationSocket.value?.disconnect?.()
+
+  notificationSocket.value = createAlertsConnection({
     onAlert: (alert) => {
       notificationAlerts.value = [
         normalizeAlert(alert),
         ...notificationAlerts.value,
       ]
     },
+    onStateChange: () => {},
+    onError: () => {},
   })
+
+  notificationSocket.value.connect()
 }
 
 function toggleNotifications() {
@@ -71,11 +200,13 @@ function closeNotifications() {
 
 onMounted(() => {
   loadHealth()
+  refreshControlPlaneService('data-processing')
+  refreshControlPlaneService('spark')
   connectNotificationSocket()
 })
 
 onBeforeUnmount(() => {
-  notificationSocket.value?.close()
+  notificationSocket.value?.disconnect?.()
 })
 </script>
 
@@ -123,6 +254,16 @@ onBeforeUnmount(() => {
     />
 
     <HealthStatusCard :health="health" :loading="healthLoading" :error="healthError" class="mb-6" />
+
+    <ControlPlanePanel
+      :services="controlPlaneServices"
+      class="mb-6"
+      @refresh-service="refreshControlPlaneService"
+      @run-action="runServiceAction"
+      @start-query="startSparkQuery"
+      @stop-query="stopSparkQuery"
+      @restart-queries="restartSparkQueries"
+    />
 
     <RouterView />
   </main>
