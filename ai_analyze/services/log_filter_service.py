@@ -1,4 +1,4 @@
-﻿from models.request_models import Alert
+from models.request_models import Alert
 from utils.endpoint_matching import log_matches_endpoints
 
 
@@ -6,8 +6,9 @@ class LogFilterService:
     def extract_logs(self, alerts: list[Alert]) -> list[str]:
         logs: list[str] = []
         for alert in alerts:
-            for completion in alert.data:
+            for completion in alert.completions:
                 logs.extend(completion.logs)
+            logs.extend(alert.sampleLogs)
         return logs
 
     def filter_logs(self, logs: list[str], client_endpoints: list[str]) -> list[str]:

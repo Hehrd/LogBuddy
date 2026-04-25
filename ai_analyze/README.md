@@ -1,6 +1,6 @@
-﻿# AI Log Analysis Service
+# AI Log Analysis Service
 
-FastAPI microservice for endpoint-filtered AI log analysis using a local Ollama model.
+FastAPI microservice for generating an AI overview for a single alert and forwarding that AI output to downstream endpoints.
 
 ## Run locally
 
@@ -29,53 +29,112 @@ uvicorn app:app --reload
 - `GET /health`
 - `POST /api/v1/log-analysis`
 
-## Sample curl
+## Request shape
 
-```bash
-curl -X POST "http://localhost:8000/api/v1/log-analysis" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "alerts": [
-      {
-        "timestamp": "2026-04-16T10:00:00Z",
-        "data": [
-          {
-            "ruleName": "SQL_INJECTION_RULE",
-            "timestamp": "2026-04-16T09:59:58Z",
-            "logs": [
-              "2026-04-16 09:59:58 WARN GET /api/auth/login 500 suspicious payload '\'' OR 1=1 --",
-              "2026-04-16 09:59:59 INFO GET /api/health 200"
-            ]
-          }
-        ]
-      }
-    ],
-    "client_endpoints": ["/api/auth/login"],
-    "ai_analysis_enabled": true
-  }'
-```
-
-## Sample response
+`POST /api/v1/log-analysis` now accepts a single alert plus a list of delivery endpoints:
 
 ```json
 {
-  "ai_analysis_enabled": true,
-  "matched_logs_count": 1,
-  "matched_logs": [
-    "2026-04-16 09:59:58 WARN GET /api/auth/login 500 suspicious payload ' OR 1=1 --"
-  ],
-  "analysis": {
-    "suspicious": true,
-    "severity": "high",
-    "attack_type": "sql_injection",
-    "summary": "Potential SQL injection attempt detected in filtered logs.",
-    "evidence": [
-      "suspicious payload ' OR 1=1 --",
-      "request path /api/auth/login"
+  "alert": {
+    "alertId": "alert-8f3c2a11",
+    "alertName": "Multiple Failed Logins Detected",
+    "alertType": "ALL_RULES_MATCHED",
+    "dataSourceName": "auth-service-prod",
+    "traceId": "trace-91ab47de",
+    "triggeredAt": "2026-04-25T15:10:45Z",
+    "firstMatchedAt": "2026-04-25T15:08:10Z",
+    "lastMatchedAt": "2026-04-25T15:10:40Z",
+    "timeWindowMillis": 300000,
+    "requiredRules": [
+      "FailedLoginThreshold",
+      "RepeatedIpAttempts"
     ],
-    "recommended_action": "Review the source IP, validate input sanitization, and inspect related authentication requests.",
-    "confidence": 0.92
+    "completions": [
+      {
+        "ruleName": "FailedLoginThreshold",
+        "timestamp": "2026-04-25T15:09:30Z",
+        "logs": [
+          "User admin failed login from 192.168.1.15",
+          "User admin failed login from 192.168.1.15",
+          "User admin failed login from 192.168.1.15"
+        ]
+      },
+      {
+        "ruleName": "RepeatedIpAttempts",
+        "timestamp": "2026-04-25T15:10:40Z",
+        "logs": [
+          "IP 192.168.1.15 attempted login for user admin",
+          "IP 192.168.1.15 attempted login for user root"
+        ]
+      }
+    ],
+    "sampleLogs": [
+      "2026-04-25T15:08:10Z WARN auth-service Failed login for admin from 192.168.1.15",
+      "2026-04-25T15:09:30Z WARN auth-service Failed login for admin from 192.168.1.15",
+      "2026-04-25T15:10:40Z WARN auth-service Failed login for root from 192.168.1.15"
+    ],
+    "aiOverviewEnabled": true
   },
-  "message": "Analysis completed successfully."
+  "endpoints": [
+    "https://example.com/incident-hook",
+    "https://example.com/archive-hook"
+  ]
+}
+```
+
+## Response shape
+
+The service returns the original alert enriched with `aiOverview`. When AI is enabled and generation succeeds, the same `aiOverview` payload is POSTed to every endpoint in `endpoints`.
+
+```json
+{
+  "alert": {
+    "alertId": "alert-8f3c2a11",
+    "alertName": "Multiple Failed Logins Detected",
+    "alertType": "ALL_RULES_MATCHED",
+    "dataSourceName": "auth-service-prod",
+    "traceId": "trace-91ab47de",
+    "triggeredAt": "2026-04-25T15:10:45Z",
+    "firstMatchedAt": "2026-04-25T15:08:10Z",
+    "lastMatchedAt": "2026-04-25T15:10:40Z",
+    "timeWindowMillis": 300000,
+    "requiredRules": [
+      "FailedLoginThreshold",
+      "RepeatedIpAttempts"
+    ],
+    "completions": [
+      {
+        "ruleName": "FailedLoginThreshold",
+        "timestamp": "2026-04-25T15:09:30Z",
+        "logs": [
+          "User admin failed login from 192.168.1.15",
+          "User admin failed login from 192.168.1.15",
+          "User admin failed login from 192.168.1.15"
+        ]
+      }
+    ],
+    "sampleLogs": [
+      "2026-04-25T15:08:10Z WARN auth-service Failed login for admin from 192.168.1.15"
+    ],
+    "aiOverviewEnabled": true,
+    "aiOverview": {
+      "suspicious": true,
+      "severity": "high",
+      "attack_type": "credential_stuffing",
+      "summary": "Repeated failed logins from one IP suggest a likely brute-force attempt.",
+      "evidence": [
+        "Multiple failed logins for admin from 192.168.1.15",
+        "Same IP attempted access across multiple usernames"
+      ],
+      "recommended_action": "Block the source IP and review authentication hardening controls.",
+      "confidence": 0.94
+    }
+  },
+  "deliveredEndpoints": [
+    "https://example.com/incident-hook",
+    "https://example.com/archive-hook"
+  ],
+  "failedDeliveries": [],
+  "message": "AI overview generated and delivered successfully."
 }
 ```

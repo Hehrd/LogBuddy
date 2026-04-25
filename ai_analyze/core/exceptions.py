@@ -1,5 +1,10 @@
-﻿class OllamaConnectionError(Exception):
-    pass
+class OllamaError(Exception):
+    """Base exception for Ollama-related failures."""
 
-class AgentResponseError(Exception):
-    pass
+
+class OllamaConnectionError(OllamaError):
+    """Raised when Ollama cannot be reached or returns an unusable HTTP response."""
+
+
+class AgentResponseError(OllamaError):
+    """Raised when Ollama responds but the model output is invalid for this service."""
