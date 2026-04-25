@@ -154,11 +154,11 @@ Observed issues:
 
 REST endpoints:
 
-- `GET /api/control-panel/health`
-- `GET /api/control-panel/status`
-- `GET /api/control-panel/sleep`
-- `GET /api/control-panel/wake`
-- `GET /api/control-panel/restart` returns `501 Not Implemented`
+- `GET /api/control-plane/health`
+- `GET /api/control-plane/status`
+- `GET /api/control-plane/sleep`
+- `GET /api/control-plane/wake`
+- `GET /api/control-plane/restart` returns `501 Not Implemented`
 
 gRPC service:
 
@@ -202,7 +202,7 @@ From the settings models, these files appear to contain:
 
 - `ds.conf`: data sources, log formats, required rules, alert definitions, schedules
 - `rule.conf`: named rules and their check definitions
-- `app.conf`: `controlPanelServerPort` and `grpcSettings`
+- `app.conf`: `grpcSettings`, Spark runtime mode, and optional Spark K8s settings
 
 ### Service 3: SparkProcessing
 
@@ -377,12 +377,9 @@ There are no sample config files in the repository, so this example is inferred 
 
 ```json
 {
-  "serverPort": 8081,
-  "controlPanelServerPort": 8080,
   "isInK8sMode": false,
   "grpcSettings": {
     "serverHost": "localhost",
-    "serverPort": 9090,
     "maxLinesPerReq": 100
   },
   "sparkK8sSettings": null
@@ -391,8 +388,8 @@ There are no sample config files in the repository, so this example is inferred 
 
 Notes:
 
-- `SparkProcessing` consumes `serverPort`, `grpcSettings`, `isInK8sMode`, and `sparkK8sSettings`.
-- `DataProcessing` consumes `controlPanelServerPort` and `grpcSettings`.
+- `SparkProcessing` consumes `grpcSettings`, `isInK8sMode`, and `sparkK8sSettings`.
+- `DataProcessing` consumes `grpcSettings`.
 - Both services disable Jackson's unknown-property failures, so a shared `app.conf` can contain the union of both models.
 
 #### Example `ds.conf`
@@ -577,6 +574,7 @@ mvn spring-boot:run
 
 Expected defaults:
 
+- HTTP server port: `6969` from `application.properties`
 - gRPC server port: `9090` from `application.properties`
 - Config files:
   - `/opt/logbuddy/config/ds.conf`
@@ -595,23 +593,22 @@ Notes:
 
 - The final shaded JAR name should be `target/spark-processing.jar` because `finalName` is `spark-processing`.
 - The service starts Spark locally with `local[*]`.
-- It also starts an embedded HTTP server on the `serverPort` value from `app.conf`.
+- It also starts an embedded HTTP server on port `16000` from `Main.java`.
 
 #### Run ControlPanel
 
-The current codebase does not contain a runnable Spring Boot bootstrap class for this service, so these instructions are tentative:
+The service now has a Spring Boot bootstrap class and an explicit HTTP port.
 
 ```bash
 cd ControlPanel
 mvn clean package
 ```
 
-Before this service can run properly, it likely needs:
+Expected defaults:
 
-- `@SpringBootApplication` in `Main.java`
-- a valid server port configuration
-- proper downstream base URLs including `http://` and ports
-- endpoint path alignment with `SparkProcessing`
+- HTTP server port: `8080` from `application.properties`
+- Downstream DataProcessing base URL: `http://localhost:6969/api/control-plane`
+- Downstream SparkProcessing base URL: `http://localhost:16000/control-plane`
 
 ## Usage
 
@@ -645,12 +642,12 @@ Before this service can run properly, it likely needs:
 
 Consumers should prefer `completions` over the old `data` field name. Some frontend/mock code in the repo still assumes the older payload and should be aligned before treating the UI as production-ready.
 
-Because `ControlPanel` is incomplete, the most reliable usage examples are against `DataProcessing` and `SparkProcessing` directly.
+The direct service examples below reflect the current hardcoded ports and control-plane route naming.
 
 ### Check DataProcessing health
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/health
+curl -i http://localhost:6969/api/control-plane/health
 ```
 
 Expected response:
@@ -659,12 +656,12 @@ Expected response:
 HTTP/1.1 200 OK
 ```
 
-The exact HTTP port is not explicit in `application.properties`, so unless another config overrides it, Spring Boot default port `8080` is the most likely assumption.
+`DataProcessing` hardcodes its HTTP port in `application.properties` as `6969`.
 
 ### Put DataProcessing to sleep
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/sleep
+curl -i http://localhost:6969/api/control-plane/sleep
 ```
 
 Expected behavior:
@@ -675,13 +672,13 @@ Expected behavior:
 ### Wake DataProcessing back up
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/wake
+curl -i http://localhost:6969/api/control-plane/wake
 ```
 
 ### Check SparkProcessing status
 
 ```bash
-curl -i http://localhost:8081/control-plane/status
+curl -i http://localhost:16000/control-plane/status
 ```
 
 Expected response:
@@ -692,12 +689,12 @@ HTTP/1.1 200 OK
 
 Assumption:
 
-- `8081` is just an example. Use the `serverPort` value from `app.conf`.
+- `16000` is the hardcoded SparkProcessing HTTP port in `Main.java`.
 
 ### List active Spark queries
 
 ```bash
-curl -i http://localhost:8081/control-plane/list-queries
+curl -i http://localhost:16000/control-plane/list-queries
 ```
 
 Expected response:
@@ -709,7 +706,7 @@ Expected response:
 ### Reload Spark config
 
 ```bash
-curl -i http://localhost:8081/control-plane/reload-config
+curl -i http://localhost:16000/control-plane/reload-config
 ```
 
 Expected behavior:
@@ -721,7 +718,7 @@ Expected behavior:
 ### Stop a Spark query
 
 ```bash
-curl -i -H "Query-Id: app-logs" http://localhost:8081/control-plane/terminate-query
+curl -i -H "Query-Id: app-logs" http://localhost:16000/control-plane/terminate-query
 ```
 
 Expected behavior:
@@ -734,21 +731,18 @@ Expected behavior:
 ### Assumptions made
 
 - The project title should remain `LogBuddy`, based on the root README, package names, Spark app name, and config paths.
-- `ControlPanel` is intended to be a Spring Boot API gateway, even though its bootstrap class is unfinished.
-- `DataProcessing` REST API likely runs on Spring Boot default port `8080` unless `server.port` is supplied externally.
-- `SparkProcessing` runs its HTTP API on `app.conf.serverPort`.
+- `ControlPanel` is a Spring Boot API gateway.
+- `DataProcessing` REST API runs on port `6969` from `application.properties`.
+- `SparkProcessing` runs its HTTP API on port `16000` from `Main.java`.
 - Config files are JSON, even though they use `.conf` extensions.
 
 ### Unclear or inconsistent parts
 
-- `ControlPanel` is incomplete and currently not runnable as a real microservice.
-- `ControlPanel` endpoint names do not match the endpoint names implemented by `SparkProcessing`.
 - `SparkProcessing` controller path matching uses `getRequestURI().getHost()` in a way that may not behave as intended.
-- `DataProcessing` has `controlPanelServerPort` in config, but its REST server port is not directly wired from that field in the visible code.
 - `DataSource.path` exists in `DataProcessing` while `SparkProcessing` uses `pathInfo`; the current setup relies on both services ignoring unknown JSON properties so one file can contain both shapes.
 - `DataProcessing/Dockerfile` looks inconsistent:
   - it copies `build/logBuddyProcessing-exec.jar`
-  - it exposes port `6969`
+  - it still appears to reference jar names inconsistently
   - it runs `logBuddy-exec.jar`
   These names do not match each other cleanly.
 
@@ -821,4 +815,4 @@ LogBuddy/
 - Standardize API naming:
   - `reload-config` vs `reload-settings`
   - `terminate-query` vs `stop-query`
-  - `control-plane` vs `control-panel`
+  - older docs and code paths used mixed `control-plane` vs `control-panel` naming

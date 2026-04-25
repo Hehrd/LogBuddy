@@ -12,7 +12,7 @@ COPY src ./src
 
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q -DskipTests package && \
-    cp build/logBuddy.jar /workspace/app.jar
+    cp target/control-panel.jar /workspace/app.jar
 
 FROM eclipse-temurin:21-jre-alpine
 
@@ -24,6 +24,6 @@ RUN addgroup -S app && adduser -S -G app app && chown -R app:app /app
 
 USER app
 
-EXPOSE 6969 9090
+EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

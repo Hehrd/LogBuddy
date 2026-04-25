@@ -27,24 +27,65 @@ public class ControlPanelController extends BaseController {
     @Override
     protected void handleGet(HttpExchange httpExchange) {
         String path = httpExchange.getRequestURI().getPath();
+        String basePath = Path.CONTROL_PLANE_PATH.getValue();
         log.debug("Received GET request for {}", path);
-        if (path.startsWith(getBasePathWithHost(httpExchange) + "/reload-config")) {
-            handleReloadSettings(httpExchange);
-        }
-        else if (path.startsWith(getBasePathWithHost(httpExchange) + "/status")) {
-            handleStatus(httpExchange);
-        }
-        else if (path.startsWith(getBasePathWithHost(httpExchange) + "/terminate-query")) {
+        if (path.equals(basePath + "/health")) {
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.equals(basePath + "/status")) {
+            sendJson(httpExchange, controlPanelService.status());
+        } else if (path.equals(basePath + "/config")) {
+            sendJson(httpExchange, controlPanelService.config());
+        } else if (path.equals(basePath + "/datasources")) {
+            sendJson(httpExchange, controlPanelService.dataSources());
+        } else if (path.equals(basePath + "/rules")) {
+            sendJson(httpExchange, controlPanelService.rules());
+        } else if (path.equals(basePath + "/queries")) {
+            sendJson(httpExchange, Map.of("queries", controlPanelService.listActiveQueries()));
+        } else if (path.startsWith(basePath + "/queries/")) {
+            handleQueryStatus(httpExchange, path.substring((basePath + "/queries/").length()));
+        } else if (path.startsWith(basePath + "/terminate-query")) {
             handleStopQuery(httpExchange);
-        } else if (path.startsWith(getBasePathWithHost(httpExchange) + "/list-queries")) {
+        } else if (path.startsWith(basePath + "/list-queries")) {
             handleListQueries(httpExchange);
+        } else {
+            sendHttpResponse(httpExchange, 404, null, null);
         }
     }
 
     @Override
     protected void handlePost(HttpExchange httpExchange) {
-        log.debug("Received POST request for {}", httpExchange.getRequestURI().getPath());
-        handleReloadSettings(httpExchange);
+        String path = httpExchange.getRequestURI().getPath();
+        String basePath = Path.CONTROL_PLANE_PATH.getValue();
+        log.debug("Received POST request for {}", path);
+        if (path.equals(basePath + "/sleep")) {
+            controlPanelService.sleep();
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.equals(basePath + "/wake")) {
+            controlPanelService.wake();
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.equals(basePath + "/restart")) {
+            controlPanelService.restart();
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.equals(basePath + "/shutdown")) {
+            controlPanelService.shutdown();
+            sendHttpResponse(httpExchange, 202, null, null);
+        } else if (path.equals(basePath + "/config/reload")) {
+            handleReloadSettings(httpExchange);
+        } else if (path.equals(basePath + "/config/validate")) {
+            sendJson(httpExchange, controlPanelService.validateConfig());
+        } else if (path.equals(basePath + "/queries/restart")) {
+            controlPanelService.restartQueries();
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.startsWith(basePath + "/queries/") && path.endsWith("/start")) {
+            String dataSource = path.substring((basePath + "/queries/").length(), path.length() - "/start".length());
+            controlPanelService.startQuery(dataSource);
+            sendHttpResponse(httpExchange, 200, null, null);
+        } else if (path.startsWith(basePath + "/queries/") && path.endsWith("/stop")) {
+            String dataSource = path.substring((basePath + "/queries/").length(), path.length() - "/stop".length());
+            stopQuery(httpExchange, dataSource);
+        } else {
+            sendHttpResponse(httpExchange, 404, null, null);
+        }
     }
 
     @Override
@@ -62,24 +103,23 @@ public class ControlPanelController extends BaseController {
 
     }
 
-    private void handleStatus(HttpExchange httpExchange) {
-        log.debug("Returning control panel status");
-        sendHttpResponse(httpExchange, 200, null, null);
-    }
-
     private void handleReloadSettings(HttpExchange httpExchange) {
         try {
-            log.info("Reload settings requested via control panel");
+            log.info("Reload settings requested via control plane");
             controlPanelService.reloadSettings();
-            sendHttpResponse(httpExchange, 200, null, null);
+            sendJson(httpExchange, Map.of("reloaded", true));
         } catch (LogBuddySparkRuntimeException e) {
-            log.error("Failed to reload settings via control panel", e);
+            log.error("Failed to reload settings via control plane", e);
             sendHttpResponse(httpExchange, 500, e.getMessage(), null);
         }
     }
 
     private void handleStopQuery(HttpExchange httpExchange) {
         String queryId = httpExchange.getRequestHeaders().getFirst("Query-Id");
+        stopQuery(httpExchange, queryId);
+    }
+
+    private void stopQuery(HttpExchange httpExchange, String queryId) {
         try {
             log.info("Stop query requested for data source {}", queryId);
             controlPanelService.stopQuery(queryId);
@@ -94,16 +134,20 @@ public class ControlPanelController extends BaseController {
     }
 
     private void handleListQueries(HttpExchange httpExchange) {
-        List<String> activeQueries = controlPanelService.listActiveQueries();
+        sendJson(httpExchange, Map.of("queries", controlPanelService.listActiveQueries()));
+    }
+
+    private void handleQueryStatus(HttpExchange httpExchange, String dataSourceName) {
+        sendJson(httpExchange, controlPanelService.queryStatus(dataSourceName));
+    }
+
+    private void sendJson(HttpExchange httpExchange, Object body) {
         try {
-            log.debug("Returning {} active queries", activeQueries.size());
             Map<String, String> headers = new HashMap<>();
             headers.put("Content-Type", "application/json");
-            sendHttpResponse(httpExchange, 200,
-                    JsonUtil.serialize(activeQueries),
-                    headers);
+            sendHttpResponse(httpExchange, 200, JsonUtil.serialize(body), headers);
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize active query list", e);
+            log.error("Failed to serialize control plane response", e);
             sendHttpResponse(httpExchange, 500, null, null);
         }
     }

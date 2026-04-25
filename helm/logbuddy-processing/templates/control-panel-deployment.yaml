@@ -1,0 +1,56 @@
+{{- if .Values.controlPanel.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logbuddy-processing.fullname" . }}-control-panel
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: control-panel
+spec:
+  replicas: {{ .Values.controlPanel.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "logbuddy-processing.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: control-panel
+  template:
+    metadata:
+      labels:
+        {{- include "logbuddy-processing.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: control-panel
+      {{- with .Values.controlPanel.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: control-panel
+          image: "{{ .Values.controlPanel.image.repository }}:{{ .Values.controlPanel.image.tag }}"
+          imagePullPolicy: {{ .Values.controlPanel.image.pullPolicy }}
+          {{- if .Values.controlPanel.env }}
+          env:
+            {{- range $key, $value := .Values.controlPanel.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.controlPanel.service.appPort }}
+          {{- with .Values.controlPanel.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.controlPanel.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlPanel.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlPanel.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

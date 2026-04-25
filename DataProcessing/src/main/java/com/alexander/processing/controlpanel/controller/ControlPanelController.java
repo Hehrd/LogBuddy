@@ -1,55 +1,98 @@
 package com.alexander.processing.controlpanel.controller;
 
-import com.alexander.processing.service.ds.DataSourceIngestService;
+import com.alexander.processing.controlpanel.service.ControlPanelService;
+import com.alexander.processing.service.metric.StreamMetricService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
-@RequestMapping("/api/control-panel")
+@RequestMapping("/api/control-plane")
 public class ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(ControlPanelController.class);
 
-    private final DataSourceIngestService dataSourceIngestService;
+    private final ControlPanelService controlPanelService;
+    private final StreamMetricService streamMetricService;
 
-    public ControlPanelController(DataSourceIngestService dataSourceIngestService) {
-        this.dataSourceIngestService = dataSourceIngestService;
+    public ControlPanelController(ControlPanelService controlPanelService,
+                                  StreamMetricService streamMetricService) {
+        this.controlPanelService = controlPanelService;
+        this.streamMetricService = streamMetricService;
     }
 
     @GetMapping("/health")
     public ResponseEntity<Void> health() {
         log.debug("Received health check request");
-        return ResponseEntity.status(HttpStatus.OK).build();
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/status")
-    public ResponseEntity<Void> status() {
+    public ResponseEntity<Map<String, Object>> status() {
         log.debug("Received status check request");
-        return ResponseEntity.status(HttpStatus.OK).build();
+        return ResponseEntity.ok(controlPanelService.status());
     }
 
-    @GetMapping("/sleep")
+    @PostMapping("/sleep")
     public ResponseEntity<Void> sleep() {
-        log.info("Pausing data source ingest via control panel");
-        dataSourceIngestService.sleep();
-        return ResponseEntity.status(HttpStatus.OK).build();
+        log.info("Pausing data source ingest via control plane");
+        controlPanelService.sleep();
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/wake")
+    @PostMapping("/wake")
     public ResponseEntity<Void> wake() {
-        log.info("Resuming data source ingest via control panel");
-        dataSourceIngestService.wake();
-        return ResponseEntity.status(HttpStatus.OK).build();
+        log.info("Resuming data source ingest via control plane");
+        controlPanelService.wake();
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/restart")
+    @PostMapping("/restart")
     public ResponseEntity<Void> restart() {
-        log.info("Restart requested via control panel but not implemented");
-        dataSourceIngestService.sleep();
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+        log.info("Restart requested via control plane");
+        controlPanelService.restart();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/shutdown")
+    public ResponseEntity<Void> shutdown() {
+        log.info("Shutdown requested via control plane");
+        controlPanelService.shutdown();
+        return ResponseEntity.accepted().build();
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, Object>> config() {
+        return ResponseEntity.ok(controlPanelService.config());
+    }
+
+    @PostMapping("/config/reload")
+    public ResponseEntity<Map<String, Object>> reloadConfig() {
+        return ResponseEntity.ok(controlPanelService.reload());
+    }
+
+    @PostMapping("/config/validate")
+    public ResponseEntity<Map<String, Object>> validateConfig() {
+        return ResponseEntity.ok(controlPanelService.validate());
+    }
+
+    @GetMapping("/datasources")
+    public ResponseEntity<Map<String, Object>> dataSources() {
+        return ResponseEntity.ok(controlPanelService.dataSources());
+    }
+
+    @GetMapping("/rules")
+    public ResponseEntity<Map<String, Object>> rules() {
+        return ResponseEntity.ok(controlPanelService.rules());
+    }
+
+    @GetMapping("/streams/metrics")
+    public ResponseEntity<Map<String, Object>> streamMetrics() {
+        return ResponseEntity.ok(Map.of("metrics", streamMetricService.latestMetrics()));
     }
 }

@@ -39,6 +39,10 @@ public class QueryScheduler {
         }
     }
 
+    public void scheduleSingle(DataSource ds) {
+        scheduleQuery(ds);
+    }
+
     public void stopAll() {
         for (StreamingQuery query : List.copyOf(rc.getActiveQueries().values())) {
             try {

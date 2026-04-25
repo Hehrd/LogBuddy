@@ -1,50 +1,133 @@
 package com.logbuddy.control.panel.controller;
 
-import com.sun.net.httpserver.HttpExchange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/spark")
+@RequestMapping("/control-plane/spark")
 public class SparkControlPanelController extends ControlPanelController {
-    private final String SPARK_HOST = "localhost";
+    private static final Logger log = LoggerFactory.getLogger(SparkControlPanelController.class);
+    private static final String SPARK_HOST = "http://localhost:16000/control-plane";
 
     @Autowired
     public SparkControlPanelController(RestTemplate restTemplate) {
         super(restTemplate);
     }
 
-    @GetMapping("/reload-settings")
-    private ResponseEntity<Void> handleReloadSettings() {
-        return restTemplate.getForEntity(SPARK_HOST + "/reload-settings", Void.class);
+    @GetMapping("/health")
+    public ResponseEntity<Void> health() {
+        log.debug("Proxying SparkProcessing health request to {}", SPARK_HOST);
+        return restTemplate.getForEntity(SPARK_HOST + "/health", Void.class);
     }
 
-    @GetMapping("/stop-query/{queryId}")
-    private ResponseEntity<Void> handleStopQuery(@PathVariable(name = "queryId") String queryId) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Query-Id", queryId);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        return restTemplate.exchange(
-                SPARK_HOST + "/stop-query",
-                HttpMethod.GET,
-                entity,
-                Void.class);
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> status() {
+        log.debug("Proxying SparkProcessing status request to {}", SPARK_HOST);
+        return exchangeMap(SPARK_HOST + "/status", HttpMethod.GET, null);
     }
 
-    @GetMapping("/list-queries")
-    private ResponseEntity<List<String>> handleListQueries() {
-        return restTemplate.exchange(
-                SPARK_HOST + "/list-queries",
-                HttpMethod.GET,
-                null,
-                new ParameterizedTypeReference<List<String>>() {});
+    @PostMapping("/sleep")
+    public ResponseEntity<Void> sleep() {
+        log.info("Proxying SparkProcessing sleep request");
+        return restTemplate.postForEntity(SPARK_HOST + "/sleep", null, Void.class);
+    }
+
+    @PostMapping("/wake")
+    public ResponseEntity<Void> wake() {
+        log.info("Proxying SparkProcessing wake request");
+        return restTemplate.postForEntity(SPARK_HOST + "/wake", null, Void.class);
+    }
+
+    @PostMapping("/restart")
+    public ResponseEntity<Void> restart() {
+        log.info("Proxying SparkProcessing restart request");
+        return restTemplate.postForEntity(SPARK_HOST + "/restart", null, Void.class);
+    }
+
+    @PostMapping("/shutdown")
+    public ResponseEntity<Void> shutdown() {
+        log.warn("Proxying SparkProcessing shutdown request");
+        return restTemplate.postForEntity(SPARK_HOST + "/shutdown", null, Void.class);
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, Object>> config() {
+        log.debug("Proxying SparkProcessing config request");
+        return exchangeMap(SPARK_HOST + "/config", HttpMethod.GET, null);
+    }
+
+    @PostMapping("/config/reload")
+    public ResponseEntity<Map<String, Object>> reloadConfig() {
+        log.info("Proxying SparkProcessing config reload request");
+        return exchangeMap(SPARK_HOST + "/config/reload", HttpMethod.POST, null);
+    }
+
+    @PostMapping("/config/validate")
+    public ResponseEntity<Map<String, Object>> validateConfig() {
+        log.info("Proxying SparkProcessing config validation request");
+        return exchangeMap(SPARK_HOST + "/config/validate", HttpMethod.POST, null);
+    }
+
+    @GetMapping("/datasources")
+    public ResponseEntity<Map<String, Object>> dataSources() {
+        log.debug("Proxying SparkProcessing datasources request");
+        return exchangeMap(SPARK_HOST + "/datasources", HttpMethod.GET, null);
+    }
+
+    @GetMapping("/rules")
+    public ResponseEntity<Map<String, Object>> rules() {
+        log.debug("Proxying SparkProcessing rules request");
+        return exchangeMap(SPARK_HOST + "/rules", HttpMethod.GET, null);
+    }
+
+    @GetMapping("/queries")
+    public ResponseEntity<Map<String, Object>> queries() {
+        log.debug("Proxying SparkProcessing queries request");
+        return exchangeMap(SPARK_HOST + "/queries", HttpMethod.GET, null);
+    }
+
+    @PostMapping("/queries/{dataSource}/start")
+    public ResponseEntity<Void> startQuery(@PathVariable String dataSource) {
+        log.info("Proxying SparkProcessing start query request for {}", dataSource);
+        return restTemplate.postForEntity(SPARK_HOST + "/queries/" + dataSource + "/start", null, Void.class);
+    }
+
+    @PostMapping("/queries/{dataSource}/stop")
+    public ResponseEntity<Void> stopQuery(@PathVariable String dataSource) {
+        log.info("Proxying SparkProcessing stop query request for {}", dataSource);
+        return restTemplate.postForEntity(SPARK_HOST + "/queries/" + dataSource + "/stop", null, Void.class);
+    }
+
+    @PostMapping("/queries/restart")
+    public ResponseEntity<Void> restartQueries() {
+        log.info("Proxying SparkProcessing restart queries request");
+        return restTemplate.postForEntity(SPARK_HOST + "/queries/restart", null, Void.class);
+    }
+
+    @GetMapping("/queries/{dataSource}")
+    public ResponseEntity<Map<String, Object>> queryStatus(@PathVariable String dataSource) {
+        log.debug("Proxying SparkProcessing query status request for {}", dataSource);
+        return exchangeMap(SPARK_HOST + "/queries/" + dataSource, HttpMethod.GET, null);
+    }
+
+    @GetMapping("/streams/metrics")
+    public ResponseEntity<Map<String, Object>> streamMetrics() {
+        log.debug("Proxying SparkProcessing stream metrics request");
+        return exchangeMap(SPARK_HOST + "/streams/metrics", HttpMethod.GET, null);
+    }
+
+    private ResponseEntity<Map<String, Object>> exchangeMap(String url, HttpMethod method, HttpEntity<?> entity) {
+        return restTemplate.exchange(url, method, entity, new ParameterizedTypeReference<>() {});
     }
 }

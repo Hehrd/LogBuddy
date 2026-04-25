@@ -6,6 +6,23 @@ config:
   mountPath: /opt/logbuddy/config
   existingConfigMap: ""
 
+controlPanel:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: logbuddy/control-panel
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    appPort: 8080
+  env: {}
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 dataProcessing:
   enabled: true
   replicaCount: 1

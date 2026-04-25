@@ -11,6 +11,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class AlertWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     public static final String ALERTS_TOPIC = "/topic/alerts";
+    public static final String STREAM_METRICS_TOPIC = "/topic/stream-metrics";
     public static final String ALERTS_ENDPOINT = "/ws/alerts";
 
     @Override

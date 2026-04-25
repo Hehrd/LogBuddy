@@ -68,7 +68,6 @@ public class SparkService implements Serializable {
             try {
                 return logParser.parseLog(row, logFormat);
             } catch (LogParsingException e) {
-//                log.warn("Dropping unparsable log from {}: {}", ds.getName(), e.getMessage());
                 return null;
             }
         }, Encoders.bean(LogEntryDTO.class))

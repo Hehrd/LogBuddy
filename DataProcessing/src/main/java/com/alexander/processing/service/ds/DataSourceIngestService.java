@@ -55,6 +55,10 @@ public class DataSourceIngestService extends IngestServiceGrpc.IngestServiceImpl
         isSleeping.set(false);
     }
 
+    public boolean isSleeping() {
+        return isSleeping.get();
+    }
+
     private class DataSourceIngestStreamObserver implements StreamObserver<IngestRequest> {
         private final AtomicLong received = new AtomicLong();
         private final StreamObserver<IngestResponse> responseObserver;
