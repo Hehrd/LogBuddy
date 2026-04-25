@@ -607,7 +607,7 @@ mvn clean package
 Expected defaults:
 
 - HTTP server port: `8080` from `application.properties`
-- Downstream DataProcessing base URL: `http://localhost:6969/api/control-panel`
+- Downstream DataProcessing base URL: `http://localhost:6969/control-panel`
 - Downstream SparkProcessing base URL: `http://localhost:16000/control-panel`
 
 ## Usage
@@ -647,7 +647,7 @@ The direct service examples below reflect the current hardcoded ports and contro
 ### Check DataProcessing health
 
 ```bash
-curl -i http://localhost:6969/api/control-panel/health
+curl -i http://localhost:6969/control-panel/health
 ```
 
 Expected response:
@@ -661,7 +661,7 @@ HTTP/1.1 200 OK
 ### Put DataProcessing to sleep
 
 ```bash
-curl -i http://localhost:6969/api/control-panel/sleep
+curl -i http://localhost:6969/control-panel/sleep
 ```
 
 Expected behavior:
@@ -672,7 +672,7 @@ Expected behavior:
 ### Wake DataProcessing back up
 
 ```bash
-curl -i http://localhost:6969/api/control-panel/wake
+curl -i http://localhost:6969/control-panel/wake
 ```
 
 ### Check SparkProcessing status

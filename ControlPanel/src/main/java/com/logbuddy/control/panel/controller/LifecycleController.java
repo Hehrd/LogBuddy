@@ -15,7 +15,7 @@ import org.springframework.web.client.RestTemplate;
 public class LifecycleController extends ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(LifecycleController.class);
     private static final String SPARK_HOST = "http://localhost:16000/control-panel";
-    private static final String DATA_HOST = "http://localhost:6969/api/control-panel";
+    private static final String DATA_HOST = "http://localhost:6969/control-panel";
 
     @Autowired
     public LifecycleController(RestTemplate restTemplate) {

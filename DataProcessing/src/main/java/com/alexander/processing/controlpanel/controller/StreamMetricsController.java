@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/metrics")
+@RequestMapping("/metrics")
 public class StreamMetricsController {
     private static final Logger log = LoggerFactory.getLogger(StreamMetricsController.class);
 

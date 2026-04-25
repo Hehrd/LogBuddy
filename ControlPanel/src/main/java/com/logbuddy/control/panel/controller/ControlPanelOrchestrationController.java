@@ -16,7 +16,7 @@ import java.util.Map;
 public class ControlPanelOrchestrationController extends ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(ControlPanelOrchestrationController.class);
     private static final String SPARK_HOST = "http://localhost:16000/control-panel";
-    private static final String DATA_HOST = "http://localhost:6969/api/control-panel";
+    private static final String DATA_HOST = "http://localhost:6969/control-panel";
 
     @Autowired
     public ControlPanelOrchestrationController(RestTemplate restTemplate) {

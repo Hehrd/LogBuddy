@@ -15,7 +15,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/control-panel/spark")
+@RequestMapping("/control-panel")
 public class SparkControlPanelController extends ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(SparkControlPanelController.class);
     private static final String SPARK_HOST = "http://localhost:16000/control-panel";
@@ -23,18 +23,6 @@ public class SparkControlPanelController extends ControlPanelController {
     @Autowired
     public SparkControlPanelController(RestTemplate restTemplate) {
         super(restTemplate);
-    }
-
-    @GetMapping("/health")
-    public ResponseEntity<Void> health() {
-        log.debug("Proxying SparkProcessing health request to {}", SPARK_HOST);
-        return restTemplate.getForEntity(SPARK_HOST + "/health", Void.class);
-    }
-
-    @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> status() {
-        log.debug("Proxying SparkProcessing status request to {}", SPARK_HOST);
-        return exchangeMap(SPARK_HOST + "/status", HttpMethod.GET, null);
     }
 
     @GetMapping("/queries")

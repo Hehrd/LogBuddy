@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/control-panel")
+@RequestMapping("/control-panel")
 public class ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(ControlPanelController.class);
 
@@ -66,15 +66,6 @@ public class ControlPanelController {
         return ResponseEntity.accepted().build();
     }
 
-    @GetMapping("/datasources")
-    public ResponseEntity<Map<String, Object>> dataSources() {
-        return ResponseEntity.ok(controlPanelService.dataSources());
-    }
-
-    @GetMapping("/rules")
-    public ResponseEntity<Map<String, Object>> rules() {
-        return ResponseEntity.ok(controlPanelService.rules());
-    }
 
     @GetMapping("/streams/metrics")
     public ResponseEntity<Map<String, Object>> streamMetrics() {

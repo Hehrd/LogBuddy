@@ -14,26 +14,14 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/control-panel/data-processing")
+@RequestMapping("/control-panel")
 public class DataProcessingControlPanelController extends ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(DataProcessingControlPanelController.class);
-    private static final String DP_HOST = "http://localhost:6969/api/control-panel";
+    private static final String DP_HOST = "http://localhost:6969/control-panel";
 
     @Autowired
     public DataProcessingControlPanelController(RestTemplate restTemplate) {
         super(restTemplate);
-    }
-
-    @GetMapping("/health")
-    public ResponseEntity<Void> health() {
-        log.debug("Proxying DataProcessing health request to {}", DP_HOST);
-        return restTemplate.getForEntity(DP_HOST + "/health", Void.class);
-    }
-
-    @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> status() {
-        log.debug("Proxying DataProcessing status request to {}", DP_HOST);
-        return exchangeMap(DP_HOST + "/status", HttpMethod.GET);
     }
 
     private ResponseEntity<Map<String, Object>> exchangeMap(String url, HttpMethod method) {

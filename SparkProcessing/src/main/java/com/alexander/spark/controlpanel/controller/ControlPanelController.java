@@ -33,10 +33,6 @@ public class ControlPanelController extends BaseController {
             sendHttpResponse(httpExchange, 200, null, null);
         } else if (path.equals(basePath + "/status")) {
             sendJson(httpExchange, controlPanelService.status());
-        } else if (path.equals(basePath + "/datasources")) {
-            sendJson(httpExchange, controlPanelService.dataSources());
-        } else if (path.equals(basePath + "/rules")) {
-            sendJson(httpExchange, controlPanelService.rules());
         } else if (path.equals(basePath + "/queries")) {
             sendJson(httpExchange, Map.of("queries", controlPanelService.listActiveQueries()));
         } else if (path.startsWith(basePath + "/queries/")) {
