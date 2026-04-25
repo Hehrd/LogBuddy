@@ -48,7 +48,6 @@ public class AlertConditionSession {
                 .flatMap(List::stream)
                 .filter(Objects::nonNull)
                 .distinct()
-                .limit(10)
                 .toList();
 
         return new Alert(
