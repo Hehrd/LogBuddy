@@ -13,6 +13,8 @@ import com.alexander.spark.log.parser.JsonLogParser;
 import com.alexander.spark.log.parser.LogFmtParser;
 import com.alexander.spark.log.parser.LogParser;
 import com.alexander.spark.log.parser.TableLogParser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FilterFunction;
 import org.apache.spark.api.java.function.MapFunction;

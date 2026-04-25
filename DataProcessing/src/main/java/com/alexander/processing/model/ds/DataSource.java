@@ -1,21 +1,36 @@
 package com.alexander.processing.model.ds;
 
 import com.alexander.processing.model.log.LogFormat;
-import com.alexander.processing.model.rule.AlertData;
-import lombok.*;
+import com.alexander.processing.model.rule.AlertCondition;
 
 import java.util.List;
 import java.util.Map;
 
-public record DataSource(String name, String path, LogFormat logFormat, List<String> requiredRules,
-                         Map<String, AlertData> alertData, DataSourceSchedule schedule) {
+public record DataSource(String name,
+                         String path,
+                         LogFormat logFormat,
+                         List<String> globalRequiredRules,
+                         List<String> traceRequiredRules,
+                         Map<String, AlertCondition> globalAlertConditions,
+                         Map<String, AlertCondition> traceAlertConditions,
+                         DataSourceSchedule schedule) {
     @Override
-    public Map<String, AlertData> alertData() {
-        return Map.copyOf(alertData);
+    public Map<String, AlertCondition> globalAlertConditions() {
+        return Map.copyOf(globalAlertConditions);
     }
 
     @Override
-    public List<String> requiredRules() {
-        return List.copyOf(requiredRules);
+    public Map<String, AlertCondition> traceAlertConditions() {
+        return Map.copyOf(traceAlertConditions);
+    }
+
+    @Override
+    public List<String> globalRequiredRules() {
+        return List.copyOf(globalRequiredRules);
+    }
+
+    @Override
+    public List<String> traceRequiredRules() {
+        return List.copyOf(traceRequiredRules);
     }
 }

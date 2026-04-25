@@ -4,7 +4,9 @@ import com.alexander.processing.exception.runtime.DataSourceIngestException;
 import com.alexander.processing.exception.runtime.DataSourceNotConfiguredException;
 import com.alexander.processing.exception.runtime.LogBuddyProcessingRuntimeException;
 import com.alexander.processing.model.ds.DataSource;
+import com.alexander.processing.model.dto.LogEntryDTO;
 import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.ingest.LogEntry;
 import com.alexander.processing.ingest.IngestRequest;
 import com.alexander.processing.ingest.IngestResponse;
 import com.alexander.processing.ingest.IngestServiceGrpc;
@@ -15,6 +17,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.grpc.server.service.GrpcService;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -75,7 +83,7 @@ public class DataSourceIngestService extends IngestServiceGrpc.IngestServiceImpl
             }
 
             try {
-                dataProcessingService.process(dataSource, req.getLogEntriesList());
+                dataProcessingService.process(dataSource, toLogEntryDtos(req.getLogEntriesList(), dataSource));
                 received.incrementAndGet();
             } catch (LogBuddyProcessingRuntimeException | TaskRejectedException e) {
                 DataSourceIngestException exception =
@@ -98,6 +106,51 @@ public class DataSourceIngestService extends IngestServiceGrpc.IngestServiceImpl
                     IngestResponse.newBuilder().setReceived(received.get()).build()
             );
             responseObserver.onCompleted();
+        }
+
+        private List<LogEntryDTO> toLogEntryDtos(List<LogEntry> logEntries, DataSource dataSource) {
+            String timestampFormat = dataSource.logFormat().defaultFields().getTimestampFormat();
+            DateTimeFormatter formatter = timestampFormat == null || timestampFormat.isBlank()
+                    ? null
+                    : DateTimeFormatter.ofPattern(timestampFormat);
+            return logEntries.stream()
+                    .map(logEntry -> toLogEntryDto(logEntry, formatter, dataSource))
+                    .toList();
+        }
+
+        private LogEntryDTO toLogEntryDto(LogEntry logEntry, DateTimeFormatter formatter, DataSource dataSource) {
+            Instant timestamp = parseTimestamp(logEntry.getTimestamp(), formatter);
+            Map<String, String> fields = new HashMap<>(logEntry.getFieldsMap());
+            String timestampField = dataSource.logFormat().defaultFields().getTimestamp();
+            if (timestampField != null && !timestampField.isBlank() && logEntry.getTimestamp() != null && !logEntry.getTimestamp().isBlank()) {
+                fields.putIfAbsent(timestampField, logEntry.getTimestamp());
+            }
+
+            return new LogEntryDTO(
+                    logEntry.getPlainText(),
+                    blankToNull(logEntry.getTraceId()),
+                    blankToNull(logEntry.getSpanId()),
+                    timestamp,
+                    Map.copyOf(fields)
+            );
+        }
+
+        private Instant parseTimestamp(String timestamp, DateTimeFormatter formatter) {
+            if (timestamp == null || timestamp.isBlank()) {
+                return Instant.now();
+            }
+            try {
+                return Instant.parse(timestamp);
+            } catch (DateTimeParseException ignored) {
+                if (formatter == null) {
+                    throw ignored;
+                }
+                return formatter.parse(timestamp, Instant::from);
+            }
+        }
+
+        private String blankToNull(String value) {
+            return value == null || value.isBlank() ? null : value;
         }
     }
 }

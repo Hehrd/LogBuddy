@@ -10,23 +10,23 @@ import java.util.Map;
 public class RuleSession {
     @Getter
     private final String ruleName;
-    private final Map<String, AlertSession> alertSessions;
+    private final Map<String, AlertConditionSession> alertSessions;
 
     @Getter
     private List<String> currentLogs;
 
 
-    public RuleSession(String ruleName, Map<String, AlertSession> alertSessions) {
+    public RuleSession(String ruleName, Map<String, AlertConditionSession> alertSessions) {
         this.ruleName = ruleName;
         currentLogs = new ArrayList<>();
         this.alertSessions = alertSessions;
     }
 
-    public void addAlertSession(AlertSession alertSession) {
-        alertSessions.put(alertSession.getAlertName(), alertSession);
+    public void addAlertSession(AlertConditionSession alertConditionSession) {
+        alertSessions.put(alertConditionSession.getAlertName(), alertConditionSession);
     }
 
-    public List<AlertSession> getAlertSessions() {
+    public List<AlertConditionSession> getAlertSessions() {
         return new ArrayList<>(alertSessions.values());
     }
 

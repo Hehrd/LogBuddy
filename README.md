@@ -2,11 +2,12 @@
 
 ## Overview
 
-LogBuddy is a log-ingestion and rule-based alerting system built as three Java microservices:
+LogBuddy is a log-ingestion and rule-based alerting system built around three backend services plus a separate frontend:
 
 1. `SparkProcessing` reads logs from streaming or file-based sources with Apache Spark Structured Streaming.
 2. `DataProcessing` receives parsed log batches over gRPC, evaluates configurable rules, and sends alerts to HTTP endpoints.
 3. `ControlPanel` appears intended to be a small HTTP gateway for controlling the other services, but it is currently incomplete.
+4. `Frontend` is a Vite + Vue application for dashboards, alerts, and config editing.
 
 The project solves a common operational problem: collecting logs from multiple platforms, normalizing them into a common structure, checking them against detection rules, and triggering alerts when combinations of rule conditions are met.
 
@@ -15,6 +16,7 @@ At a high level:
 - Spark handles ingestion and parsing.
 - A Spring Boot service handles rule evaluation and alert dispatch.
 - A lightweight control layer is intended to expose operational endpoints such as health, reload, sleep/wake, and query listing/stopping.
+- A Vue frontend consumes live alerts over WebSocket and offers UI flows for config and monitoring.
 
 ## Architecture
 
@@ -179,10 +181,14 @@ service IngestService {
 
 The rule engine currently supports these check types:
 
-- `LogLevelCheck`
-- `DataRegexMatchCheck`
-- `MessageLengthCheck`
-- `TimestampCheck`
+- `string_value_check`
+- `numeric_value_check`
+- `data_regex_match_check`
+- `timestamp_check`
+- `duplicate_event_check`
+- `fields_change_check`
+
+`fields_change_check` is trace-oriented. It now evaluates event pairs, not isolated field hits across the whole trace. A trace matches only when one compared pair satisfies all configured field transition rules together.
 
 #### Configuration expectations
 
@@ -416,16 +422,30 @@ Notes:
           "logger": "logger"
         },
         "customFields": {
-          "requestId": "STRING"
+          "requestId": "TEXT",
+          "statusCode": "NUMERIC",
+          "retryCount": "NUMERIC"
         }
       },
-      "requiredRules": ["error-level-rule"],
-      "alertData": {
+      "globalRequiredRules": ["error_regex_rule"],
+      "traceRequiredRules": ["user_status_transition_rule"],
+      "globalAlertConditions": {
         "error-alert": {
           "alertName": "error-alert",
-          "requiredRules": ["error-level-rule"],
+          "requiredRules": ["error_regex_rule"],
           "timeWindowMillis": 60000,
           "alertEndpoints": ["http://localhost:9000/webhook"],
+          "alertConditionType": "GLOBAL",
+          "aiOverviewEnabled": false
+        }
+      },
+      "traceAlertConditions": {
+        "trace-change-alert": {
+          "alertName": "trace-change-alert",
+          "requiredRules": ["user_status_transition_rule"],
+          "timeWindowMillis": 60000,
+          "alertEndpoints": ["http://localhost:9000/webhook"],
+          "alertConditionType": "PER_LOG_TRACE",
           "aiOverviewEnabled": false
         }
       },
@@ -443,18 +463,91 @@ Notes:
 - `SparkProcessing` reads `pathInfo`.
 - `DataProcessing` reads `path`.
 - Because both services ignore unknown JSON properties, one shared `ds.conf` can carry both fields.
+- `DataProcessing` expects `globalRequiredRules`, `traceRequiredRules`, `globalAlertConditions`, and `traceAlertConditions`.
 
 #### Example `rule.conf`
 
 ```json
 {
   "rules": {
-    "error-level-rule": {
-      "ruleName": "error-level-rule",
-      "check": {
-        "type": "log_level_check",
-        "level": "ERROR"
-      },
+    "error_regex_rule": {
+      "ruleName": "error_regex_rule",
+      "checks": [
+        {
+          "type": "data_regex_match_check",
+          "fields": {
+            "msg": {
+              "matches": ".*ERROR.*",
+              "notMatches": null
+            }
+          }
+        }
+      ],
+      "logTargetCount": 1,
+      "maxCompletionsPerAlert": 1
+    },
+    "user_status_transition_rule": {
+      "ruleName": "user_status_transition_rule",
+      "checks": [
+        {
+          "type": "fields_change_check",
+          "fields": {
+            "userId": {
+              "mode": "CHANGED",
+              "previousCheck": {
+                "type": "string_value_check",
+                "values": {
+                  "userId": {
+                    "equalTo": "anonymous",
+                    "notEqualTo": null,
+                    "longerThan": 0,
+                    "shorterThan": 0
+                  }
+                }
+              },
+              "currentCheck": {
+                "type": "string_value_check",
+                "values": {
+                  "userId": {
+                    "equalTo": null,
+                    "notEqualTo": "anonymous",
+                    "longerThan": 0,
+                    "shorterThan": 0
+                  }
+                }
+              }
+            },
+            "statusCode": {
+              "mode": "CHANGED",
+              "previousCheck": {
+                "type": "numeric_value_check",
+                "values": {
+                  "statusCode": {
+                    "lessThan": null,
+                    "moreThan": null,
+                    "equalTo": 401,
+                    "notEqualTo": null,
+                    "divisibleBy": null
+                  }
+                }
+              },
+              "currentCheck": {
+                "type": "numeric_value_check",
+                "values": {
+                  "statusCode": {
+                    "lessThan": null,
+                    "moreThan": null,
+                    "equalTo": 200,
+                    "notEqualTo": null,
+                    "divisibleBy": null
+                  }
+                }
+              }
+            }
+          },
+          "strategy": "COMPARE_TO_PREVIOUS_EVENT"
+        }
+      ],
       "logTargetCount": 1,
       "maxCompletionsPerAlert": 1
     }
@@ -462,12 +555,16 @@ Notes:
 }
 ```
 
-The `check.type` discriminator values defined in code are:
+The `checks[].type` discriminator values defined in code are:
 
-- `log_level_check`
+- `string_value_check`
+- `numeric_value_check`
 - `data_regex_match_check`
-- `message_length_check`
 - `timestamp_check`
+- `duplicate_event_check`
+- `fields_change_check`
+
+For `fields_change_check`, each configured field is evaluated against the same `(referenceEvent, currentEvent)` pair selected by `strategy`.
 
 ### How to run each service
 
@@ -517,6 +614,36 @@ Before this service can run properly, it likely needs:
 - endpoint path alignment with `SparkProcessing`
 
 ## Usage
+
+### Alert payload shape
+
+`DataProcessing` currently emits alerts with this high-level structure:
+
+```json
+{
+  "alertId": "uuid",
+  "alertName": "trace-change-alert",
+  "alertType": "PER_LOG_TRACE",
+  "dataSourceName": "app-logs",
+  "traceId": "trace-123",
+  "triggeredAt": "2026-04-25T09:20:00Z",
+  "firstMatchedAt": "2026-04-25T09:18:00Z",
+  "lastMatchedAt": "2026-04-25T09:19:30Z",
+  "timeWindowMillis": 60000,
+  "requiredRules": ["user_status_transition_rule"],
+  "completions": [
+    {
+      "ruleName": "user_status_transition_rule",
+      "timestamp": "2026-04-25T09:19:30Z",
+      "logs": ["..."]
+    }
+  ],
+  "sampleLogs": ["..."],
+  "aiOverviewEnabled": false
+}
+```
+
+Consumers should prefer `completions` over the old `data` field name. Some frontend/mock code in the repo still assumes the older payload and should be aligned before treating the UI as production-ready.
 
 Because `ControlPanel` is incomplete, the most reliable usage examples are against `DataProcessing` and `SparkProcessing` directly.
 

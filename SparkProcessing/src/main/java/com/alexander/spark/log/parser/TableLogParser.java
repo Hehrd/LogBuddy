@@ -1,11 +1,10 @@
 package com.alexander.spark.log.parser;
 
-import com.alexander.spark.log.DefaultFields;
-import com.alexander.spark.log.FieldType;
 import com.alexander.spark.log.LogEntryDTO;
 import com.alexander.spark.log.LogFormat;
 import com.alexander.spark.log.LogType;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.types.StructField;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -19,22 +18,13 @@ public class TableLogParser extends LogParser implements Serializable {
 
     @Override
     public LogEntryDTO parseLog(Row log, LogFormat format) {
-        DefaultFields df = format.defaultFields();
-        Map<String, FieldType> customFields = format.customFields();
-        Map<String, String> customValues = new HashMap<>();
-        for (String field : customFields.keySet()) {
-            customValues.put(field, log.getAs(field));
+        Map<String, String> fields = new HashMap<>();
+        for (StructField field : log.schema().fields()) {
+            String fieldName = field.name();
+            Object value = log.getAs(fieldName);
+            fields.put(fieldName, value == null ? null : String.valueOf(value));
         }
-        return new LogEntryDTO(
-                log.toString(),
-                df.getTimestamp(),
-                log.getAs(df.getLevel()),
-                log.getAs(df.getMessage()),
-                log.getAs(df.getSource()),
-                log.getAs(df.getData()),
-                log.getAs(df.getLogger()),
-                customValues
-        );
 
+        return buildLogEntry(log.toString(), fields, format);
     }
 }

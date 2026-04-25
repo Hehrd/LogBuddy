@@ -1,9 +1,9 @@
 package com.alexander.processing.model.rule.check;
 
+import com.alexander.processing.model.rule.check.trace.DuplicateEventCheck;
+import com.alexander.processing.model.rule.check.trace.FieldsChangeCheck;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.Data;
-import lombok.Getter;
 
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
@@ -11,10 +11,12 @@ import lombok.Getter;
         property = "type"
 )
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = DataRegexMatchCheck.class, name = "data_regex_match_check"),
-        @JsonSubTypes.Type(value = TimestampCheck.class, name = "timestamp_check"),
-        @JsonSubTypes.Type(value = LogLevelCheck.class, name = "log_level_check"),
-        @JsonSubTypes.Type(value = MessageLengthCheck.class, name = "message_length_check"),
+        @JsonSubTypes.Type(value = StringValueCheck.class, name = "string_value_check"),
+        @JsonSubTypes.Type(value = NumericValueCheck.class, name = "numeric_value_check"),
+        @JsonSubTypes.Type(value = RegexMatchValueCheck.class, name = "data_regex_match_check"),
+        @JsonSubTypes.Type(value = TimestampValueCheck.class, name = "timestamp_check"),
+        @JsonSubTypes.Type(value = DuplicateEventCheck.class, name = "duplicate_event_check"),
+        @JsonSubTypes.Type(value = FieldsChangeCheck.class, name = "fields_change_check"),
 })
 public interface Check {
 }
