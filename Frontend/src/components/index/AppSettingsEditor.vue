@@ -12,8 +12,8 @@ defineEmits(['update-field'])
 <template>
   <section class="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
     <label class="grid gap-1 text-sm">
-      <HelpLabel label="Server port" :help="fieldHelp.serverPort" />
-      <input :value="value.serverPort" type="number" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-field', 'serverPort', Number($event.target.value))" />
+      <HelpLabel label="Control panel server port" :help="fieldHelp.controlPanelServerPort" />
+      <input :value="value.controlPanelServerPort" type="number" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-field', 'controlPanelServerPort', Number($event.target.value))" />
     </label>
     <label class="grid gap-1 text-sm">
       <HelpLabel label="gRPC host" :help="fieldHelp.grpcHost" />

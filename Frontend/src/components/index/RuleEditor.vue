@@ -43,10 +43,6 @@ defineEmits(['context-menu', 'add-rule', 'update-rule'])
           <option v-for="option in checkTypeOptions" :key="option" :value="option">{{ option }}</option>
         </select>
       </label>
-      <label class="grid gap-1 text-sm">
-        <HelpLabel label="Metric name" :help="fieldHelp.metricName" />
-        <input :value="activeRule.check?.metricName" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-rule', 'metricName', $event.target.value)" />
-      </label>
       <label v-if="'pattern' in (activeRule.check ?? {})" class="grid gap-1 text-sm">
         <HelpLabel label="Pattern" :help="fieldHelp.pattern" />
         <input :value="activeRule.check?.pattern" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-rule', 'pattern', $event.target.value)" />
@@ -62,6 +58,14 @@ defineEmits(['context-menu', 'add-rule', 'update-rule'])
       <label v-if="'longerThan' in (activeRule.check ?? {})" class="grid gap-1 text-sm">
         <HelpLabel label="Longer than" :help="fieldHelp.longerThan" />
         <input :value="activeRule.check?.longerThan" type="number" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-rule', 'longerThan', $event.target.value)" />
+      </label>
+      <label v-if="'before' in (activeRule.check ?? {})" class="grid gap-1 text-sm">
+        <HelpLabel label="Before timestamp" :help="fieldHelp.before" />
+        <input :value="activeRule.check?.before" type="datetime-local" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-rule', 'before', $event.target.value)" />
+      </label>
+      <label v-if="'after' in (activeRule.check ?? {})" class="grid gap-1 text-sm">
+        <HelpLabel label="After timestamp" :help="fieldHelp.after" />
+        <input :value="activeRule.check?.after" type="datetime-local" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-rule', 'after', $event.target.value)" />
       </label>
       <label class="grid gap-1 text-sm">
         <HelpLabel label="Log target count" :help="fieldHelp.logTargetCount" />
