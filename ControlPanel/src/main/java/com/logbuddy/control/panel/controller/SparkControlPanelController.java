@@ -15,10 +15,10 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/control-plane/spark")
+@RequestMapping("/control-panel/spark")
 public class SparkControlPanelController extends ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(SparkControlPanelController.class);
-    private static final String SPARK_HOST = "http://localhost:16000/control-plane";
+    private static final String SPARK_HOST = "http://localhost:16000/control-panel";
 
     @Autowired
     public SparkControlPanelController(RestTemplate restTemplate) {
@@ -35,60 +35,6 @@ public class SparkControlPanelController extends ControlPanelController {
     public ResponseEntity<Map<String, Object>> status() {
         log.debug("Proxying SparkProcessing status request to {}", SPARK_HOST);
         return exchangeMap(SPARK_HOST + "/status", HttpMethod.GET, null);
-    }
-
-    @PostMapping("/sleep")
-    public ResponseEntity<Void> sleep() {
-        log.info("Proxying SparkProcessing sleep request");
-        return restTemplate.postForEntity(SPARK_HOST + "/sleep", null, Void.class);
-    }
-
-    @PostMapping("/wake")
-    public ResponseEntity<Void> wake() {
-        log.info("Proxying SparkProcessing wake request");
-        return restTemplate.postForEntity(SPARK_HOST + "/wake", null, Void.class);
-    }
-
-    @PostMapping("/restart")
-    public ResponseEntity<Void> restart() {
-        log.info("Proxying SparkProcessing restart request");
-        return restTemplate.postForEntity(SPARK_HOST + "/restart", null, Void.class);
-    }
-
-    @PostMapping("/shutdown")
-    public ResponseEntity<Void> shutdown() {
-        log.warn("Proxying SparkProcessing shutdown request");
-        return restTemplate.postForEntity(SPARK_HOST + "/shutdown", null, Void.class);
-    }
-
-    @GetMapping("/config")
-    public ResponseEntity<Map<String, Object>> config() {
-        log.debug("Proxying SparkProcessing config request");
-        return exchangeMap(SPARK_HOST + "/config", HttpMethod.GET, null);
-    }
-
-    @PostMapping("/config/reload")
-    public ResponseEntity<Map<String, Object>> reloadConfig() {
-        log.info("Proxying SparkProcessing config reload request");
-        return exchangeMap(SPARK_HOST + "/config/reload", HttpMethod.POST, null);
-    }
-
-    @PostMapping("/config/validate")
-    public ResponseEntity<Map<String, Object>> validateConfig() {
-        log.info("Proxying SparkProcessing config validation request");
-        return exchangeMap(SPARK_HOST + "/config/validate", HttpMethod.POST, null);
-    }
-
-    @GetMapping("/datasources")
-    public ResponseEntity<Map<String, Object>> dataSources() {
-        log.debug("Proxying SparkProcessing datasources request");
-        return exchangeMap(SPARK_HOST + "/datasources", HttpMethod.GET, null);
-    }
-
-    @GetMapping("/rules")
-    public ResponseEntity<Map<String, Object>> rules() {
-        log.debug("Proxying SparkProcessing rules request");
-        return exchangeMap(SPARK_HOST + "/rules", HttpMethod.GET, null);
     }
 
     @GetMapping("/queries")

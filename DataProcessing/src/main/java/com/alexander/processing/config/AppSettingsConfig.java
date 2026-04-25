@@ -1,11 +1,11 @@
 package com.alexander.processing.config;
 
-import com.alexander.processing.settings.AppConfigurationSettings;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingAppConfig;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import com.alexander.processing.exception.runtime.DataSourceConfigNotFoundException;
 import com.alexander.processing.exception.runtime.InvalidDataSourceConfigFormatException;
-import com.alexander.processing.settings.DataSourceSettings;
-import com.alexander.processing.settings.RuleSettings;
+import com.alexander.processing.settings.ProcessingDataSourceConfig;
+import com.alexander.processing.settings.ProcessingRuleConfig;
 import com.alexander.processing.util.JsonUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,7 +31,7 @@ public class AppSettingsConfig {
     private static final String APP_CONFIG_PATH = "app.conf";
 
     @Bean
-    public AppSettings appSettings(@Value("${config.path}") String configPath) {
+    public ProcessingRuntimeSettings appSettings(@Value("${config.path}") String configPath) {
         Path basePath = Path.of(configPath);
         Path appConfigPath = basePath.resolve(APP_CONFIG_PATH);
         Path dataSourceConfigPath = basePath.resolve(DS_CONFIG_PATH);
@@ -39,19 +39,19 @@ public class AppSettingsConfig {
 
         try {
             log.info("Loading configuration from {}", appConfigPath);
-            AppConfigurationSettings appConfigurationSettings =
-                    readConfig(appConfigPath, new TypeReference<AppConfigurationSettings>() {});
+            ProcessingAppConfig appConfigurationSettings =
+                    readConfig(appConfigPath, new TypeReference<ProcessingAppConfig>() {});
 
             log.info("Loading configuration from {}", dataSourceConfigPath);
-            DataSourceSettings dataSourceSettings =
-                    readConfig(dataSourceConfigPath, new TypeReference<DataSourceSettings>() {});
+            ProcessingDataSourceConfig dataSourceSettings =
+                    readConfig(dataSourceConfigPath, new TypeReference<ProcessingDataSourceConfig>() {});
 
             log.info("Loading configuration from {}", ruleConfigPath);
-            RuleSettings ruleSettings =
-                    readConfig(ruleConfigPath, new TypeReference<RuleSettings>() {});
+            ProcessingRuleConfig ruleSettings =
+                    readConfig(ruleConfigPath, new TypeReference<ProcessingRuleConfig>() {});
 
             log.info("Configuration loaded successfully");
-            return new AppSettings(appConfigurationSettings, dataSourceSettings, ruleSettings);
+            return new ProcessingRuntimeSettings(appConfigurationSettings, dataSourceSettings, ruleSettings);
         } catch (JsonProcessingException e) {
             String message = String.format("Could not deserialize config file from %s, error at %s:%s",
                     e.getLocation() == null ? "unknown" : e.getLocation().sourceDescription(),

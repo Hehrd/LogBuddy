@@ -1,9 +1,9 @@
 package com.alexander.spark.context;
 
-import com.alexander.spark.settings.AppConfigurationSettings;
-import com.alexander.spark.settings.AppSettings;
-import com.alexander.spark.settings.DataSourceSettings;
-import com.alexander.spark.settings.SparkK8sSettings;
+import com.alexander.spark.settings.SparkAppConfig;
+import com.alexander.spark.settings.SparkDataSourceConfig;
+import com.alexander.spark.settings.SparkKubernetesConfig;
+import com.alexander.spark.settings.SparkRuntimeSettings;
 import com.alexander.spark.exception.runtime.ConfigurationFileReadException;
 import com.alexander.spark.exception.runtime.InvalidConfigurationFormatException;
 import com.alexander.spark.exception.runtime.InvalidSparkK8sConfigurationException;
@@ -33,7 +33,7 @@ public class RuntimeContext {
     private static final String APP_CONFIG_PATH = "/opt/logbuddy/config/app.conf";
 
     private SparkSession sparkSession;
-    private AppSettings appSettings;
+    private SparkRuntimeSettings appSettings;
     private Map<String, UUID> queryIds;
     private Map<UUID, String> queryNames;
     private Map<UUID, StreamingQuery> activeQueries;
@@ -68,9 +68,9 @@ public class RuntimeContext {
 
     public void loadSettings() {
         log.info("Loading runtime settings");
-        DataSourceSettings dataSourceSettings = readConfig(DS_CONFIG_PATH, DataSourceSettings.class);
-        AppConfigurationSettings appConfigurationSettings = readConfig(APP_CONFIG_PATH, AppConfigurationSettings.class);
-        appSettings = new AppSettings(appConfigurationSettings, dataSourceSettings);
+        SparkDataSourceConfig dataSourceSettings = readConfig(DS_CONFIG_PATH, SparkDataSourceConfig.class);
+        SparkAppConfig appConfigurationSettings = readConfig(APP_CONFIG_PATH, SparkAppConfig.class);
+        appSettings = new SparkRuntimeSettings(appConfigurationSettings, dataSourceSettings);
         log.info("Loaded runtime settings for {} data sources", dataSourceSettings.dataSources().size());
     }
 
@@ -120,7 +120,7 @@ public class RuntimeContext {
     }
 
     private SparkConf initK8sSparkConf() {
-        SparkK8sSettings sparkK8sSettings = appSettings.appConfigurationSettings().sparkK8sSettings();
+        SparkKubernetesConfig sparkK8sSettings = appSettings.appConfigurationSettings().sparkK8sSettings();
         if (sparkK8sSettings == null) {
             throw new InvalidSparkK8sConfigurationException(
                     "sparkK8sSettings must be configured when isInK8sMode is true");

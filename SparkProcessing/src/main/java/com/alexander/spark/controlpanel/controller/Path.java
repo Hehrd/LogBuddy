@@ -1,7 +1,7 @@
 package com.alexander.spark.controlpanel.controller;
 
 public enum Path {
-    CONTROL_PLANE_PATH("/control-plane");
+    CONTROL_PLANE_PATH("/control-panel");
 
     private final String value;
 
@@ -13,4 +13,3 @@ public enum Path {
         return value;
     }
 }
-

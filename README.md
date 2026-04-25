@@ -154,11 +154,11 @@ Observed issues:
 
 REST endpoints:
 
-- `GET /api/control-plane/health`
-- `GET /api/control-plane/status`
-- `GET /api/control-plane/sleep`
-- `GET /api/control-plane/wake`
-- `GET /api/control-plane/restart` returns `501 Not Implemented`
+- `GET /api/control-panel/health`
+- `GET /api/control-panel/status`
+- `GET /api/control-panel/sleep`
+- `GET /api/control-panel/wake`
+- `GET /api/control-panel/restart` returns `501 Not Implemented`
 
 gRPC service:
 
@@ -247,10 +247,10 @@ It also starts a small embedded HTTP server for runtime controls such as reloadi
 
 HTTP endpoints exposed by the embedded server:
 
-- `GET /control-plane/status`
-- `GET /control-plane/reload-config`
-- `GET /control-plane/terminate-query` with header `Query-Id: <data-source-name>`
-- `GET /control-plane/list-queries`
+- `GET /control-panel/status`
+- `GET /control-panel/reload-config`
+- `GET /control-panel/terminate-query` with header `Query-Id: <data-source-name>`
+- `GET /control-panel/list-queries`
 
 Behavior notes:
 
@@ -607,8 +607,8 @@ mvn clean package
 Expected defaults:
 
 - HTTP server port: `8080` from `application.properties`
-- Downstream DataProcessing base URL: `http://localhost:6969/api/control-plane`
-- Downstream SparkProcessing base URL: `http://localhost:16000/control-plane`
+- Downstream DataProcessing base URL: `http://localhost:6969/api/control-panel`
+- Downstream SparkProcessing base URL: `http://localhost:16000/control-panel`
 
 ## Usage
 
@@ -642,12 +642,12 @@ Expected defaults:
 
 Consumers should prefer `completions` over the old `data` field name. Some frontend/mock code in the repo still assumes the older payload and should be aligned before treating the UI as production-ready.
 
-The direct service examples below reflect the current hardcoded ports and control-plane route naming.
+The direct service examples below reflect the current hardcoded ports and control-panel route naming.
 
 ### Check DataProcessing health
 
 ```bash
-curl -i http://localhost:6969/api/control-plane/health
+curl -i http://localhost:6969/api/control-panel/health
 ```
 
 Expected response:
@@ -661,7 +661,7 @@ HTTP/1.1 200 OK
 ### Put DataProcessing to sleep
 
 ```bash
-curl -i http://localhost:6969/api/control-plane/sleep
+curl -i http://localhost:6969/api/control-panel/sleep
 ```
 
 Expected behavior:
@@ -672,13 +672,13 @@ Expected behavior:
 ### Wake DataProcessing back up
 
 ```bash
-curl -i http://localhost:6969/api/control-plane/wake
+curl -i http://localhost:6969/api/control-panel/wake
 ```
 
 ### Check SparkProcessing status
 
 ```bash
-curl -i http://localhost:16000/control-plane/status
+curl -i http://localhost:16000/control-panel/status
 ```
 
 Expected response:
@@ -694,7 +694,7 @@ Assumption:
 ### List active Spark queries
 
 ```bash
-curl -i http://localhost:16000/control-plane/list-queries
+curl -i http://localhost:16000/control-panel/list-queries
 ```
 
 Expected response:
@@ -706,7 +706,7 @@ Expected response:
 ### Reload Spark config
 
 ```bash
-curl -i http://localhost:16000/control-plane/reload-config
+curl -i http://localhost:16000/control-panel/reload-config
 ```
 
 Expected behavior:
@@ -718,7 +718,7 @@ Expected behavior:
 ### Stop a Spark query
 
 ```bash
-curl -i -H "Query-Id: app-logs" http://localhost:16000/control-plane/terminate-query
+curl -i -H "Query-Id: app-logs" http://localhost:16000/control-panel/terminate-query
 ```
 
 Expected behavior:
@@ -815,4 +815,4 @@ LogBuddy/
 - Standardize API naming:
   - `reload-config` vs `reload-settings`
   - `terminate-query` vs `stop-query`
-  - older docs and code paths used mixed `control-plane` vs `control-panel` naming
+  - older docs and code paths used mixed route naming before the current `control-panel` standard

@@ -2,7 +2,7 @@ package com.alexander.spark.query.service;
 
 import com.alexander.spark.ds.model.DataSource;
 import com.alexander.spark.ds.model.DataSourcePathInfo;
-import com.alexander.spark.settings.GrpcSettings;
+import com.alexander.spark.settings.SparkGrpcConfig;
 import com.alexander.spark.exception.checked.LogParsingException;
 import com.alexander.spark.exception.runtime.QuerySchedulingException;
 import com.alexander.spark.exception.runtime.UnsupportedLogFormatException;
@@ -35,11 +35,11 @@ import java.util.concurrent.TimeoutException;
 public class SparkService implements Serializable {
 //    private static final Logger log = LogManager.getLogger(SparkService.class);
 
-    private final GrpcSettings grpcSettings;
+    private final SparkGrpcConfig grpcSettings;
 
     private final Broadcast<Map<LogType, LogParser>> logParsersBc;
 
-    public SparkService(GrpcSettings grpcSettings, SparkSession sparkSession) {
+    public SparkService(SparkGrpcConfig grpcSettings, SparkSession sparkSession) {
         this.grpcSettings = grpcSettings;
         logParsersBc = initLogParsers(sparkSession);
     }

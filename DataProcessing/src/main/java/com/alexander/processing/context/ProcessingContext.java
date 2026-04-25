@@ -5,7 +5,7 @@ import com.alexander.processing.model.rule.AlertCondition;
 import com.alexander.processing.model.rule.AlertConditionSession;
 import com.alexander.processing.model.rule.ProcessingSession;
 import com.alexander.processing.model.rule.RuleSession;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ public class ProcessingContext {
     private final Map<String, ProcessingSession> processingSessions = new HashMap<>();
 
     @Autowired
-    public ProcessingContext(AppSettings appSettings) {
+    public ProcessingContext(ProcessingRuntimeSettings appSettings) {
         Collection<DataSource> dataSources = appSettings.dataSourceSettings().dataSources().values();
         for (DataSource dataSource : dataSources) {
             ProcessingSession processingSession = createProcessingSession(dataSource);

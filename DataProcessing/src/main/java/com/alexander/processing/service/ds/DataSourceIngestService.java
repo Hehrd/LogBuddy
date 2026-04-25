@@ -5,7 +5,7 @@ import com.alexander.processing.exception.runtime.DataSourceNotConfiguredExcepti
 import com.alexander.processing.exception.runtime.LogBuddyProcessingRuntimeException;
 import com.alexander.processing.model.ds.DataSource;
 import com.alexander.processing.model.dto.LogEntryDTO;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import com.alexander.processing.ingest.LogEntry;
 import com.alexander.processing.ingest.IngestRequest;
 import com.alexander.processing.ingest.IngestResponse;
@@ -30,12 +30,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class DataSourceIngestService extends IngestServiceGrpc.IngestServiceImplBase {
     private static final Logger log = LoggerFactory.getLogger(DataSourceIngestService.class);
 
-    private final AppSettings appSettings;
+    private final ProcessingRuntimeSettings appSettings;
     private final DataProcessingService dataProcessingService;
 
     private final AtomicBoolean isSleeping;
 
-    public DataSourceIngestService(AppSettings appSettings,
+    public DataSourceIngestService(ProcessingRuntimeSettings appSettings,
                                    DataProcessingService dataProcessingService) {
         this.appSettings = appSettings;
         this.dataProcessingService = dataProcessingService;

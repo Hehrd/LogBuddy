@@ -33,8 +33,6 @@ public class ControlPanelController extends BaseController {
             sendHttpResponse(httpExchange, 200, null, null);
         } else if (path.equals(basePath + "/status")) {
             sendJson(httpExchange, controlPanelService.status());
-        } else if (path.equals(basePath + "/config")) {
-            sendJson(httpExchange, controlPanelService.config());
         } else if (path.equals(basePath + "/datasources")) {
             sendJson(httpExchange, controlPanelService.dataSources());
         } else if (path.equals(basePath + "/rules")) {
@@ -69,10 +67,6 @@ public class ControlPanelController extends BaseController {
         } else if (path.equals(basePath + "/shutdown")) {
             controlPanelService.shutdown();
             sendHttpResponse(httpExchange, 202, null, null);
-        } else if (path.equals(basePath + "/config/reload")) {
-            handleReloadSettings(httpExchange);
-        } else if (path.equals(basePath + "/config/validate")) {
-            sendJson(httpExchange, controlPanelService.validateConfig());
         } else if (path.equals(basePath + "/queries/restart")) {
             controlPanelService.restartQueries();
             sendHttpResponse(httpExchange, 200, null, null);
@@ -101,17 +95,6 @@ public class ControlPanelController extends BaseController {
     @Override
     protected void handlePatch(HttpExchange httpExchange) {
 
-    }
-
-    private void handleReloadSettings(HttpExchange httpExchange) {
-        try {
-            log.info("Reload settings requested via control plane");
-            controlPanelService.reloadSettings();
-            sendJson(httpExchange, Map.of("reloaded", true));
-        } catch (LogBuddySparkRuntimeException e) {
-            log.error("Failed to reload settings via control plane", e);
-            sendHttpResponse(httpExchange, 500, e.getMessage(), null);
-        }
     }
 
     private void handleStopQuery(HttpExchange httpExchange) {

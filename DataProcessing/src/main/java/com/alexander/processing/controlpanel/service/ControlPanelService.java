@@ -2,7 +2,7 @@ package com.alexander.processing.controlpanel.service;
 
 import com.alexander.processing.config.AppSettingsConfig;
 import com.alexander.processing.service.ds.DataSourceIngestService;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Service;
@@ -12,13 +12,13 @@ import java.util.Map;
 @Service
 public class ControlPanelService {
     private final DataSourceIngestService dataSourceIngestService;
-    private final AppSettings appSettings;
+    private final ProcessingRuntimeSettings appSettings;
     private final AppSettingsConfig appSettingsConfig;
     private final ConfigurableApplicationContext applicationContext;
     private final String configPath;
 
     public ControlPanelService(DataSourceIngestService dataSourceIngestService,
-                               AppSettings appSettings,
+                               ProcessingRuntimeSettings appSettings,
                                AppSettingsConfig appSettingsConfig,
                                ConfigurableApplicationContext applicationContext,
                                @Value("${config.path}") String configPath) {
@@ -55,7 +55,7 @@ public class ControlPanelService {
     }
 
     public Map<String, Object> reload() {
-        AppSettings reloaded = appSettingsConfig.appSettings(configPath);
+        ProcessingRuntimeSettings reloaded = appSettingsConfig.appSettings(configPath);
         return Map.of(
                 "reloaded", true,
                 "dataSourceCount", reloaded.dataSourceSettings().dataSources().size(),
@@ -64,7 +64,7 @@ public class ControlPanelService {
     }
 
     public Map<String, Object> validate() {
-        AppSettings validated = appSettingsConfig.appSettings(configPath);
+        ProcessingRuntimeSettings validated = appSettingsConfig.appSettings(configPath);
         return Map.of(
                 "valid", true,
                 "dataSourceCount", validated.dataSourceSettings().dataSources().size(),

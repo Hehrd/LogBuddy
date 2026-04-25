@@ -13,7 +13,7 @@ import com.alexander.processing.model.rule.RuleCompletion;
 import com.alexander.processing.model.rule.RuleSession;
 import com.alexander.processing.service.alert.AlertingService;
 import com.alexander.processing.service.rule.RuleProcessingService;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,12 +29,12 @@ public class DataProcessingService {
     private static final Logger log = LoggerFactory.getLogger(DataProcessingService.class);
 
     private final ProcessingContext processingContext;
-    private final AppSettings appSettings;
+    private final ProcessingRuntimeSettings appSettings;
 
     private final RuleProcessingService ruleProcessingService;
     private final AlertingService alertingService;
 
-    public DataProcessingService(ProcessingContext processingContext, AppSettings appSettings,
+    public DataProcessingService(ProcessingContext processingContext, ProcessingRuntimeSettings appSettings,
                                  RuleProcessingService ruleProcessingService,
                                  AlertingService alertingService) {
         this.processingContext = processingContext;

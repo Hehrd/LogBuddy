@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/control-plane")
+@RequestMapping("/api/control-panel")
 public class ControlPanelController {
     private static final Logger log = LoggerFactory.getLogger(ControlPanelController.class);
 
@@ -40,45 +40,30 @@ public class ControlPanelController {
 
     @PostMapping("/sleep")
     public ResponseEntity<Void> sleep() {
-        log.info("Pausing data source ingest via control plane");
+        log.info("Pausing data source ingest via control panel");
         controlPanelService.sleep();
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/wake")
     public ResponseEntity<Void> wake() {
-        log.info("Resuming data source ingest via control plane");
+        log.info("Resuming data source ingest via control panel");
         controlPanelService.wake();
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/restart")
     public ResponseEntity<Void> restart() {
-        log.info("Restart requested via control plane");
+        log.info("Restart requested via control panel");
         controlPanelService.restart();
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/shutdown")
     public ResponseEntity<Void> shutdown() {
-        log.info("Shutdown requested via control plane");
+        log.info("Shutdown requested via control panel");
         controlPanelService.shutdown();
         return ResponseEntity.accepted().build();
-    }
-
-    @GetMapping("/config")
-    public ResponseEntity<Map<String, Object>> config() {
-        return ResponseEntity.ok(controlPanelService.config());
-    }
-
-    @PostMapping("/config/reload")
-    public ResponseEntity<Map<String, Object>> reloadConfig() {
-        return ResponseEntity.ok(controlPanelService.reload());
-    }
-
-    @PostMapping("/config/validate")
-    public ResponseEntity<Map<String, Object>> validateConfig() {
-        return ResponseEntity.ok(controlPanelService.validate());
     }
 
     @GetMapping("/datasources")
