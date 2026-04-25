@@ -1,4 +1,20 @@
 services:
+  control-panel:
+    build:
+      context: ./ControlPanel
+      dockerfile: Dockerfile
+    container_name: logbuddy-control-panel
+    env_file:
+      - .env
+    ports:
+      - "${CONTROL_PANEL_PORT:-8080}:8080"
+    depends_on:
+      - data-processing
+      - spark-processing
+    restart: unless-stopped
+    networks:
+      - logbuddy
+
   data-processing:
     build:
       context: ./DataProcessing
@@ -6,10 +22,8 @@ services:
     container_name: logbuddy-data-processing
     env_file:
       - .env
-    environment:
-      APP_PORT: ${DATA_PROCESSING_PORT}
     ports:
-      - "${DATA_PROCESSING_PORT}:8080"
+      - "${DATA_PROCESSING_PORT}:6969"
       - "${GRPC_PORT}:9090"
     volumes:
       - ./config:/opt/logbuddy/config:ro
@@ -24,10 +38,8 @@ services:
     container_name: logbuddy-spark-processing
     env_file:
       - .env
-    environment:
-      APP_PORT: ${SPARK_PORT}
     ports:
-      - "${SPARK_PORT}:8081"
+      - "${SPARK_PORT}:16000"
     volumes:
       - ./config:/opt/logbuddy/config:ro
     depends_on:

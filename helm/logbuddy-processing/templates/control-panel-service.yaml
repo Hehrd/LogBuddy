@@ -1,0 +1,19 @@
+{{- if .Values.controlPanel.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "logbuddy-processing.fullname" . }}-control-panel
+  labels:
+    {{- include "logbuddy-processing.labels" . | nindent 4 }}
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: control-panel
+spec:
+  type: {{ .Values.controlPanel.service.type }}
+  selector:
+    {{- include "logbuddy-processing.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: control-panel
+  ports:
+    - name: http
+      port: {{ .Values.controlPanel.service.appPort }}
+      targetPort: http
+{{- end }}

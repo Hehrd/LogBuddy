@@ -26,12 +26,9 @@ message IngestResponse {
 
 message LogEntry {
   string plainText = 1;
-  string timestamp = 2;
-  string level = 3;
-  string message = 4;
-  string source = 5;
-  string data = 6;
-  string logger = 7;
-  map<string, string> customFields = 8;
+  string traceId = 2;
+  string spanId = 3;
+  string timestamp = 5;
+  map<string, string> fields = 6;
 }
 

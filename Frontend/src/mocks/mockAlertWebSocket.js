@@ -1,48 +1,119 @@
 const mockAlerts = [
   {
-    id: 'mock-alert-001',
-    alertName: 'alert_data_one',
-    sourceName: 'app_json_source',
-    data: [
+    alertId: 'alert-8f3c2a11',
+    alertName: 'Multiple Failed Logins Detected',
+    alertType: 'ALL_RULES_MATCHED',
+    dataSourceName: 'auth-service-prod',
+    traceId: 'trace-91ab47de',
+    timeWindowMillis: 300000,
+    requiredRules: [
+      'FailedLoginThreshold',
+      'RepeatedIpAttempts',
+    ],
+    completions: [
       {
-        ruleName: 'error_regex_rule',
+        ruleName: 'FailedLoginThreshold',
         logs: [
-          '2026-04-17T12:01:08Z ERROR Payment API returned code 500',
-          '2026-04-17T12:01:09Z ERROR Payment API timeout after 30s',
+          'User admin failed login from 192.168.1.15',
+          'User admin failed login from 192.168.1.15',
+          'User admin failed login from 192.168.1.15',
+        ],
+      },
+      {
+        ruleName: 'RepeatedIpAttempts',
+        logs: [
+          'IP 192.168.1.15 attempted login for user admin',
+          'IP 192.168.1.15 attempted login for user root',
         ],
       },
     ],
+    sampleLogs: [
+      '2026-04-25T15:08:10Z WARN auth-service Failed login for admin from 192.168.1.15',
+      '2026-04-25T15:09:30Z WARN auth-service Failed login for admin from 192.168.1.15',
+      '2026-04-25T15:10:40Z WARN auth-service Failed login for root from 192.168.1.15',
+    ],
+    aiOverviewEnabled: true,
   },
   {
-    id: 'mock-alert-002',
-    alertName: 'alert_data_two',
-    sourceName: 'app_logfmt_source',
-    data: [
+    alertId: 'alert-1ac4be02',
+    alertName: 'Admin Access Pattern',
+    alertType: 'ALL_RULES_MATCHED',
+    dataSourceName: 'audit-logs',
+    traceId: 'trace-6ad1c892',
+    timeWindowMillis: 300000,
+    requiredRules: [
+      'suspicious-admin-access',
+      'log_format_check',
+    ],
+    completions: [
       {
-        ruleName: 'warn_level_rule',
+        ruleName: 'suspicious-admin-access',
         logs: [
-          'ts=2026-04-17T12:02:11Z level=WARN msg="worker queue is growing"',
-          'ts=2026-04-17T12:02:12Z level=WARN msg="retry budget is almost exhausted"',
+          'admin access from 203.0.113.7',
+          'admin access from 203.0.113.7',
+        ],
+      },
+      {
+        ruleName: 'log_format_check',
+        logs: [
+          'timestamp format mismatch on audit event',
         ],
       },
     ],
+    sampleLogs: [
+      '2026-04-25T16:01:11Z WARN audit-service admin access from 203.0.113.7',
+      '2026-04-25T16:02:19Z ERROR audit-service malformed timestamp',
+    ],
+    aiOverviewEnabled: false,
   },
   {
-    id: 'mock-alert-003',
-    alertName: 'multi_rule_alert',
-    sourceName: 'app_json_source',
-    data: [
+    alertId: 'alert-54bf7343',
+    alertName: 'Credential Abuse Cluster',
+    alertType: 'ALL_RULES_MATCHED',
+    dataSourceName: 'auth-service-prod',
+    traceId: 'trace-0244ff31',
+    timeWindowMillis: 300000,
+    requiredRules: [
+      'FailedLoginThreshold',
+      'RepeatedIpAttempts',
+    ],
+    completions: [
       {
-        ruleName: 'error_regex_rule',
-        logs: ['2026-04-17T12:03:14Z ERROR parser failed on input batch'],
+        ruleName: 'FailedLoginThreshold',
+        logs: [
+          'User root failed login from 192.168.1.44',
+          'User root failed login from 192.168.1.44',
+        ],
       },
       {
-        ruleName: 'message_length_rule',
-        logs: ['2026-04-17T12:03:15Z WARN oversized ingest payload detected'],
+        ruleName: 'RepeatedIpAttempts',
+        logs: [
+          'IP 192.168.1.44 attempted login for user root',
+          'IP 192.168.1.44 attempted login for user deploy',
+        ],
       },
     ],
+    sampleLogs: [
+      '2026-04-25T17:03:14Z WARN auth-service Failed login for root from 192.168.1.44',
+      '2026-04-25T17:04:15Z WARN auth-service Failed login for deploy from 192.168.1.44',
+    ],
+    aiOverviewEnabled: true,
   },
 ]
+
+function enrichAlert(template) {
+  const now = new Date().toISOString()
+  return {
+    ...template,
+    triggeredAt: now,
+    firstMatchedAt: template.firstMatchedAt ?? now,
+    lastMatchedAt: template.lastMatchedAt ?? now,
+    completions: template.completions.map((completion) => ({
+      ...completion,
+      timestamp: completion.timestamp ?? now,
+    })),
+  }
+}
 
 export class MockAlertWebSocket extends EventTarget {
   static CONNECTING = 0
@@ -69,17 +140,25 @@ export class MockAlertWebSocket extends EventTarget {
 
     if (message.includes('ping')) {
       this.emitAlert({
-        id: `mock-alert-pong-${Date.now()}`,
-        sourceName: 'mock_server',
+        alertId: `mock-alert-pong-${Date.now()}`,
         alertName: 'connection_health',
-        data: [
+        alertType: 'HEARTBEAT',
+        dataSourceName: 'mock_server',
+        traceId: `trace-${Date.now()}`,
+        timeWindowMillis: 60000,
+        requiredRules: ['heartbeat'],
+        completions: [
           {
             ruleName: 'heartbeat',
             timestamp: new Date().toISOString(),
             logs: ['Mock alert socket received a heartbeat from the client.'],
           },
         ],
-        timestamp: new Date().toISOString(),
+        sampleLogs: ['Mock alert socket received a heartbeat from the client.'],
+        aiOverviewEnabled: false,
+        triggeredAt: new Date().toISOString(),
+        firstMatchedAt: new Date().toISOString(),
+        lastMatchedAt: new Date().toISOString(),
       })
     }
   }
@@ -105,15 +184,7 @@ export class MockAlertWebSocket extends EventTarget {
     const template = mockAlerts[this.alertIndex % mockAlerts.length]
     this.alertIndex += 1
 
-    this.emitAlert({
-      ...template,
-      id: `${template.id}-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      data: template.data.map((completion) => ({
-        ...completion,
-        timestamp: new Date().toISOString(),
-      })),
-    })
+    this.emitAlert(enrichAlert(template))
   }
 
   emitAlert(alert) {

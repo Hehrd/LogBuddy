@@ -9,6 +9,7 @@ import lombok.Getter;
 import org.apache.spark.sql.Row;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
 
 public abstract class LogParser implements Serializable {
@@ -21,15 +22,30 @@ public abstract class LogParser implements Serializable {
 
     public abstract LogEntryDTO parseLog(Row log, LogFormat format) throws LogParsingException;
 
+    protected LogEntryDTO buildLogEntry(String plainText, Map<String, String> fields, LogFormat format) {
+        Map<String, String> normalizedFields = fields == null ? new HashMap<>() : new HashMap<>(fields);
+        return new LogEntryDTO(
+                plainText,
+                getNamedFieldValue(normalizedFields, format.traceIdFieldName()),
+                getNamedFieldValue(normalizedFields, format.spanIdFieldName()),
+                getNamedFieldValue(normalizedFields, format.timestampFieldName()),
+                normalizedFields
+        );
+    }
+
+    private String getNamedFieldValue(Map<String, String> fields, String fieldName) {
+        if (fieldName == null || fieldName.isBlank()) {
+            return null;
+        }
+        return fields.get(fieldName);
+    }
+
     @Data
     protected static class ParsedFields implements Serializable {
-        private Map<String, String> defaultValues;
-        private Map<String, String> customValues;
+        private Map<String, String> values;
 
-        protected ParsedFields(Map<String, String> defaultValues,
-                               Map<String, String> customValues) {
-            this.defaultValues = defaultValues;
-            this.customValues = customValues;
+        protected ParsedFields(Map<String, String> values) {
+            this.values = values;
         }
     }
 }

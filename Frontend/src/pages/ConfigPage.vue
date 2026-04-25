@@ -9,141 +9,12 @@ import EditorToolbar from '../components/EditorToolbar.vue'
 import AppSettingsEditor from '../components/index/AppSettingsEditor.vue'
 import DataSourceEditor from '../components/index/DataSourceEditor.vue'
 import RuleEditor from '../components/index/RuleEditor.vue'
-import { fetchConfigBundle } from '../services/backendApi.js'
-const starterConfigs = {
-  ds: `{
-  "dataSources": {
-    "app_json_source": {
-      "name": "app_json_source",
-      "pathInfo": {
-        "location": "hdfs://localhost:9000/test",
-        "platform": "FILE_TEXT",
-        "options": {}
-      },
-      "logFormat": {
-        "logType": "JSON",
-        "defaultFields": {
-          "timestamp": "ts",
-          "timestampFormat": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
-          "level": "lvl",
-          "message": "msg",
-          "source": "src",
-          "data": "data",
-          "logger": "logger"
-        },
-        "customFields": {}
-      },
-      "requiredRules": [
-        "error_regex_rule",
-        "warn_level_rule"
-      ],
-      "alertData": {
-        "alert_data_one": {
-          "alertName": "alert_data_one",
-          "requiredRules": ["error_regex_rule"],
-          "timeWindowMillis": 300000,
-          "alertEndpoints": ["slack://ops-alerts"]
-        },
-        "alert_data_two": {
-          "alertName": "alert_data_two",
-          "requiredRules": ["warn_level_rule"],
-          "timeWindowMillis": 600000,
-          "alertEndpoints": ["email://oncall@example.com"]
-        }
-      },
-      "schedule": {
-        "delayAfterStartUpMillis": 5000
-      }
-    },
-    "app_logfmt_source": {
-      "name": "app_logfmt_source",
-      "pathInfo": {
-        "location": "hdfs://localhost:9000/test2",
-        "platform": "FILE_TEXT",
-        "options": {}
-      },
-      "logFormat": {
-        "logType": "LOGFMT",
-        "defaultFields": {
-          "timestamp": "ts",
-          "timestampFormat": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
-          "level": "lvl",
-          "message": "msg",
-          "source": "src",
-          "data": "data",
-          "logger": "logger"
-        },
-        "customFields": {}
-      },
-      "requiredRules": [
-        "error_regex_rule",
-        "warn_level_rule"
-      ],
-      "alertData": {
-        "alert_data_one": {
-          "alertName": "alert_data_one",
-          "requiredRules": ["error_regex_rule"],
-          "timeWindowMillis": 300000,
-          "alertEndpoints": ["slack://ops-alerts"]
-        },
-        "alert_data_two": {
-          "alertName": "alert_data_two",
-          "requiredRules": ["warn_level_rule"],
-          "timeWindowMillis": 600000,
-          "alertEndpoints": ["email://oncall@example.com"]
-        }
-      },
-      "schedule": {
-        "delayAfterStartUpMillis": 5000
-      }
-    }
-  }
-}`,
-  rule: `{
-  "rules": {
-    "error_regex_rule": {
-      "ruleName": "error_regex_rule",
-      "check": {
-        "type": "data_regex_match_check",
-        "metricName": "error_pattern_count",
-        "pattern": "15"
-      },
-      "logTargetCount": 1,
-      "maxCompletionsPerAlert": 2
-    },
-    "warn_level_rule": {
-      "ruleName": "warn_level_rule",
-      "check": {
-        "type": "log_level_check",
-        "metricName": "warn_level_count",
-        "level": "WARN"
-      },
-      "logTargetCount": 1,
-      "maxCompletionsPerAlert": 3
-    },
-    "message_length_rule": {
-      "ruleName": "message_length_rule",
-      "check": {
-        "type": "message_length_check",
-        "metricName": "long_message_count",
-        "shorterThan": 200,
-        "longerThan": 10
-      },
-      "logTargetCount": 1,
-      "maxCompletionsPerAlert": 1
-    }
-  }
-}`,
-  app: `{
-  "serverPort": 6969,
-  "grpcSettings": {
-    "serverHost": "localhost",
-    "serverPort": 9090,
-    "maxLinesPerReq": 1000
-  }
-}`,
-}
+import { isMockMode } from '../config/runtime.js'
+import { formatApiError } from '../services/httpClient.js'
+import { fetchControlPlaneDataSources, fetchControlPlaneRules } from '../services/backendApi.js'
+import { mockConfigDrafts } from '../mocks/mockData.js'
 
+const starterConfigs = mockConfigDrafts
 const emptyConfigs = {
   ds: `{
   "dataSources": {}
@@ -152,7 +23,7 @@ const emptyConfigs = {
   "rules": {}
 }`,
   app: `{
-  "serverPort": 0,
+  "controlPanelServerPort": 0,
   "grpcSettings": {
     "serverHost": "",
     "serverPort": 0,
@@ -167,42 +38,31 @@ const checkTypeOptions = [
   'log_level_check',
   'message_length_check',
 ]
-
-const platformOptions = [
-  'KAFKA',
-  'PULSAR',
-  'FILE_TEXT',
-  'DELTA',
-  'ICEBERG',
-  'HUDI',
-  'SOCKET',
-  'RATE',
-]
-
 const logTypeOptions = ['JSON', 'LOGFMT', 'CUSTOM']
 const storageKey = 'logbuddy.configDrafts.v1'
 
 const fieldHelp = {
   sourceName: 'Unique data source name. Rules and sessions refer to this source by name.',
-  platform: 'Where logs come from: streams, files, lakehouse tables, or testing utilities.',
-  location: 'Location of the cloud storage for this data source.',
-  options: 'Connection options for Apache spark',
+  path: 'Flat source path expected by the current Java backend for each data source.',
   logType: 'Parser type for incoming log records: JSON, LOGFMT, or CUSTOM.',
   requiredRules: 'Rules are created in the Rules tab. Select them on alerts to decide which checks run against this data source.',
   startupDelay: 'Milliseconds to wait after startup before this source begins processing.',
+  intervalsMillis: 'Optional repeat intervals in milliseconds, written as a comma-separated list.',
   alertName: 'Unique alert group name under this data source.',
   windowMillis: 'Time window in milliseconds for grouping rule matches into this alert.',
-  alertEndpoints: 'Endpoint to be notified when there is an alert.',
+  alertEndpoints: 'HTTP endpoints invoked by the backend when there is an alert.',
+  aiOverviewEnabled: 'Enables the backend flag that requests AI-generated alert overviews.',
   ruleName: 'Unique rule name. Data sources and alerts attach to this name.',
   checkType: 'Backend check implementation type for this rule.',
-  metricName: 'Metric key emitted for matches from this rule.',
   pattern: 'Regex or value pattern used by data_regex_match_check.',
   level: 'Log level to match for log_level_check, such as WARN or ERROR.',
   shorterThan: 'Upper message length bound for message_length_check.',
   longerThan: 'Lower message length bound for message_length_check.',
+  before: 'Upper timestamp bound for timestamp_check, using a local date-time input.',
+  after: 'Lower timestamp bound for timestamp_check, using a local date-time input.',
   logTargetCount: 'Number of matching log entries required before the rule completes.',
   maxCompletions: 'Maximum rule completions allowed per alert session.',
-  serverPort: 'HTTP server port used by the app.',
+  controlPanelServerPort: 'HTTP port used by the control panel application config.',
   grpcHost: 'Hostname for the gRPC connection.',
   grpcPort: 'gRPC port used for ingest communication.',
   maxLinesPerReq: 'Maximum log lines sent per gRPC request.',
@@ -218,13 +78,13 @@ const configMeta = {
   rule: {
     label: 'Rules',
     rootKey: 'rules',
-    description: 'Describe checks, metrics, completion thresholds, and matching behavior.',
+    description: 'Describe checks, completion thresholds, and matching behavior.',
     filename: 'rule.conf',
   },
   app: {
     label: 'App settings',
     rootKey: null,
-    description: 'Keep runtime port and gRPC settings in one small config.',
+    description: 'Keep control panel runtime port and gRPC settings in one small config.',
     filename: 'app.conf',
   },
 }
@@ -232,9 +92,8 @@ const configMeta = {
 const activeConfig = ref('ds')
 const editorMode = ref('form')
 const linuxConfigPathAvailable = ref(false)
-const configLoadStatus = ref('idle')
-const configLoadError = ref('')
 const restoredDrafts = loadSavedDrafts()
+const bootstrapError = ref('')
 const confirmDialog = reactive({
   open: false,
   title: '',
@@ -251,7 +110,7 @@ const contextMenu = reactive({
 })
 const editorState = reactive(
   Object.fromEntries(
-    Object.entries(starterConfigs).map(([key, value]) => [
+    Object.entries(starterConfigs).map(([key]) => [
       key,
       {
         text: restoredDrafts?.[key]?.text ?? emptyConfigs[key],
@@ -262,9 +121,9 @@ const editorState = reactive(
 )
 
 const selectedKeys = reactive({
-  dsSource: 'app_json_source',
+  dsSource: 'app-logs',
   dsAlert: 'alert_data_one',
-  rule: 'error_regex_rule',
+  rule: 'log_format_check',
 })
 
 function safeParse(text) {
@@ -276,9 +135,7 @@ function safeParse(text) {
 }
 
 const parsedConfigs = computed(() =>
-  Object.fromEntries(
-    Object.entries(editorState).map(([key, state]) => [key, safeParse(state.text)]),
-  ),
+  Object.fromEntries(Object.entries(editorState).map(([key, state]) => [key, safeParse(state.text)])),
 )
 
 const activeText = computed({
@@ -287,11 +144,10 @@ const activeText = computed({
     editorState[activeConfig.value].text = value
   },
 })
-
 const activeParsed = computed(() => parsedConfigs.value[activeConfig.value])
 const activeMeta = computed(() => configMeta[activeConfig.value])
-
 const activeJsonValue = computed(() => activeParsed.value.value)
+
 const configStats = computed(() => {
   return Object.entries(parsedConfigs.value).map(([key, parsed]) => {
     const meta = configMeta[key]
@@ -315,14 +171,12 @@ const configStats = computed(() => {
 
 const activeSummary = computed(() => {
   const parsed = activeParsed.value
-  if (parsed.error || !parsed.value) {
-    return []
-  }
+  if (parsed.error || !parsed.value) return []
 
   if (activeConfig.value === 'ds') {
     return Object.values(parsed.value.dataSources ?? {}).map((source) => ({
       title: source.name,
-      subtitle: `${source.logFormat?.logType ?? 'Unknown'} via ${source.pathInfo?.platform ?? 'Unknown'}`,
+      subtitle: `${source.logFormat?.logType ?? 'Unknown'} from ${source.path ?? 'Unknown path'}`,
       detail: `${Object.keys(source.alertData ?? {}).length} alerts, ${source.requiredRules?.length ?? 0} required rules`,
     }))
   }
@@ -337,7 +191,7 @@ const activeSummary = computed(() => {
 
   return [
     {
-      title: `HTTP ${parsed.value.serverPort ?? 'Unknown'}`,
+      title: `HTTP ${parsed.value.controlPanelServerPort ?? 'Unknown'}`,
       subtitle: `gRPC ${parsed.value.grpcSettings?.serverHost ?? 'Unknown'}:${parsed.value.grpcSettings?.serverPort ?? 'Unknown'}`,
       detail: `Max lines ${parsed.value.grpcSettings?.maxLinesPerReq ?? 'Unknown'}`,
     },
@@ -346,9 +200,7 @@ const activeSummary = computed(() => {
 
 const activeError = computed(() => {
   const error = activeParsed.value.error
-  if (!error) {
-    return null
-  }
+  if (!error) return null
 
   const message = error.message ?? 'Invalid JSON'
   const positionMatch = message.match(/position\s+(\d+)/i)
@@ -358,60 +210,36 @@ const activeError = computed(() => {
   }
 })
 
-const dsSources = computed(() => {
-  return Object.entries(activeJsonValue.value?.dataSources ?? {})
-})
-
+const dsSources = computed(() => Object.entries(activeJsonValue.value?.dataSources ?? {}))
 const activeDsSourceKey = computed(() => {
   const entries = dsSources.value
-  if (!entries.length) {
-    return null
-  }
-  if (!entries.some(([key]) => key === selectedKeys.dsSource)) {
-    selectedKeys.dsSource = entries[0][0]
-  }
+  if (!entries.length) return null
+  if (!entries.some(([key]) => key === selectedKeys.dsSource)) selectedKeys.dsSource = entries[0][0]
   return selectedKeys.dsSource
 })
-
 const activeDsSource = computed(() => {
   const key = activeDsSourceKey.value
   return key ? activeJsonValue.value.dataSources[key] : null
 })
-
-const activeAlerts = computed(() => {
-  return Object.entries(activeDsSource.value?.alertData ?? {})
-})
-
+const activeAlerts = computed(() => Object.entries(activeDsSource.value?.alertData ?? {}))
 const activeDsAlertKey = computed(() => {
   const entries = activeAlerts.value
-  if (!entries.length) {
-    return null
-  }
-  if (!entries.some(([key]) => key === selectedKeys.dsAlert)) {
-    selectedKeys.dsAlert = entries[0][0]
-  }
+  if (!entries.length) return null
+  if (!entries.some(([key]) => key === selectedKeys.dsAlert)) selectedKeys.dsAlert = entries[0][0]
   return selectedKeys.dsAlert
 })
-
 const activeDsAlert = computed(() => {
   const key = activeDsAlertKey.value
   return key ? activeDsSource.value.alertData[key] : null
 })
-
 const rulesList = computed(() => Object.entries(activeJsonValue.value?.rules ?? {}))
 const configuredRules = computed(() => Object.entries(parsedConfigs.value.rule.value?.rules ?? {}))
-
 const activeRuleKey = computed(() => {
   const entries = rulesList.value
-  if (!entries.length) {
-    return null
-  }
-  if (!entries.some(([key]) => key === selectedKeys.rule)) {
-    selectedKeys.rule = entries[0][0]
-  }
+  if (!entries.length) return null
+  if (!entries.some(([key]) => key === selectedKeys.rule)) selectedKeys.rule = entries[0][0]
   return selectedKeys.rule
 })
-
 const activeRule = computed(() => {
   const key = activeRuleKey.value
   return key ? activeJsonValue.value.rules[key] : null
@@ -419,9 +247,16 @@ const activeRule = computed(() => {
 
 function setActiveConfig(key) {
   activeConfig.value = key
+  if (!isMockMode && key !== 'app') {
+    editorMode.value = 'raw'
+  }
 }
 
 function setEditorMode(mode) {
+  if (!isMockMode && activeConfig.value !== 'app' && mode === 'form') {
+    editorMode.value = 'raw'
+    return
+  }
   editorMode.value = mode
 }
 
@@ -441,16 +276,12 @@ function closeContextMenu() {
 }
 
 function formatActiveJson() {
-  if (!activeParsed.value.value) {
-    return
-  }
+  if (!activeParsed.value.value) return
   activeText.value = JSON.stringify(activeParsed.value.value, null, 2)
 }
 
 function minifyActiveJson() {
-  if (!activeParsed.value.value) {
-    return
-  }
+  if (!activeParsed.value.value) return
   activeText.value = JSON.stringify(activeParsed.value.value)
 }
 
@@ -461,9 +292,7 @@ function resetActiveJson() {
 
 async function importJson(event, key) {
   const [file] = event.target.files ?? []
-  if (!file) {
-    return
-  }
+  if (!file) return
 
   const text = await file.text()
   editorState[key].text = text
@@ -477,9 +306,7 @@ function updateActiveJson(mutator) {
 
 function updateConfigJson(configKey, mutator) {
   const parsed = parsedConfigs.value[configKey].value
-  if (!parsed) {
-    return
-  }
+  if (!parsed) return
 
   const nextValue = JSON.parse(JSON.stringify(parsed))
   mutator(nextValue)
@@ -499,72 +326,23 @@ function updateAppField(field, value) {
 
 function updateDsSourceField(field, value) {
   const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
+  if (!sourceKey) return
 
   updateActiveJson((draft) => {
     const source = draft.dataSources[sourceKey]
     if (field === 'name') source.name = value
-    if (field === 'location') source.pathInfo.location = value
-    if (field === 'platform') source.pathInfo.platform = value
+    if (field === 'path') source.path = value
     if (field === 'logType') source.logFormat.logType = value
     if (field === 'requiredRules') source.requiredRules = csvToList(value)
     if (field === 'delayAfterStartUpMillis') source.schedule.delayAfterStartUpMillis = toNumber(value)
-  })
-}
-
-function updateDataSourceOption(optionKey, nextKey, nextValue) {
-  const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
-
-  updateConfigJson('ds', (draft) => {
-    const source = draft.dataSources[sourceKey]
-    const options = { ...(source.pathInfo.options ?? {}) }
-    delete options[optionKey]
-    if (nextKey.trim()) {
-      options[nextKey.trim()] = nextValue
-    }
-    source.pathInfo.options = options
-  })
-}
-
-function addDataSourceOption() {
-  const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
-
-  updateConfigJson('ds', (draft) => {
-    const source = draft.dataSources[sourceKey]
-    const options = { ...(source.pathInfo.options ?? {}) }
-    options[createUniqueKey(options, 'option')] = ''
-    source.pathInfo.options = options
-  })
-}
-
-function deleteDataSourceOption(optionKey) {
-  const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
-
-  updateConfigJson('ds', (draft) => {
-    const source = draft.dataSources[sourceKey]
-    const options = { ...(source.pathInfo.options ?? {}) }
-    delete options[optionKey]
-    source.pathInfo.options = options
+    if (field === 'intervalsMillis') source.schedule.intervalsMillis = csvToNumberList(value)
   })
 }
 
 function updateAlertField(field, value) {
   const sourceKey = activeDsSourceKey.value
   const alertKey = activeDsAlertKey.value
-  if (!sourceKey || !alertKey) {
-    return
-  }
+  if (!sourceKey || !alertKey) return
 
   updateActiveJson((draft) => {
     const alert = draft.dataSources[sourceKey].alertData[alertKey]
@@ -572,15 +350,14 @@ function updateAlertField(field, value) {
     if (field === 'requiredRules') alert.requiredRules = csvToList(value)
     if (field === 'timeWindowMillis') alert.timeWindowMillis = toNumber(value)
     if (field === 'alertEndpoints') alert.alertEndpoints = csvToList(value)
+    if (field === 'aiOverviewEnabled') alert.aiOverviewEnabled = Boolean(value)
   })
 }
 
 function toggleAlertRule(ruleName) {
   const sourceKey = activeDsSourceKey.value
   const alertKey = activeDsAlertKey.value
-  if (!sourceKey || !alertKey) {
-    return
-  }
+  if (!sourceKey || !alertKey) return
 
   updateConfigJson('ds', (draft) => {
     const alert = draft.dataSources[sourceKey].alertData[alertKey]
@@ -591,19 +368,18 @@ function toggleAlertRule(ruleName) {
 
 function updateRuleField(field, value) {
   const ruleKey = activeRuleKey.value
-  if (!ruleKey) {
-    return
-  }
+  if (!ruleKey) return
 
   updateActiveJson((draft) => {
     const rule = draft.rules[ruleKey]
     if (field === 'ruleName') rule.ruleName = value
-    if (field === 'type') rule.check.type = value
-    if (field === 'metricName') rule.check.metricName = value
+    if (field === 'type') rule.check = createCheckDraft(value)
     if (field === 'pattern') rule.check.pattern = value
     if (field === 'level') rule.check.level = value
     if (field === 'shorterThan') rule.check.shorterThan = toNumber(value)
     if (field === 'longerThan') rule.check.longerThan = toNumber(value)
+    if (field === 'before') rule.check.before = normalizeDateTimeValue(value)
+    if (field === 'after') rule.check.after = normalizeDateTimeValue(value)
     if (field === 'logTargetCount') rule.logTargetCount = toNumber(value)
     if (field === 'maxCompletionsPerAlert') rule.maxCompletionsPerAlert = toNumber(value)
   })
@@ -614,11 +390,7 @@ function addDataSource() {
     const key = createUniqueKey(draft.dataSources, 'new_source')
     draft.dataSources[key] = {
       name: key,
-      pathInfo: {
-        location: '',
-        platform: 'FILE_TEXT',
-        options: {},
-      },
+      path: '',
       logFormat: {
         logType: 'JSON',
         defaultFields: {
@@ -636,6 +408,7 @@ function addDataSource() {
       alertData: {},
       schedule: {
         delayAfterStartUpMillis: 0,
+        intervalsMillis: [],
       },
     }
     selectedKeys.dsSource = key
@@ -645,9 +418,7 @@ function addDataSource() {
 function syncSourceRequiredRules(source) {
   const rules = new Set()
   for (const alert of Object.values(source.alertData ?? {})) {
-    for (const rule of alert.requiredRules ?? []) {
-      rules.add(rule)
-    }
+    for (const rule of alert.requiredRules ?? []) rules.add(rule)
   }
   source.requiredRules = [...rules]
 }
@@ -655,9 +426,7 @@ function syncSourceRequiredRules(source) {
 function duplicateDataSource(sourceKey) {
   updateConfigJson('ds', (draft) => {
     const source = draft.dataSources[sourceKey]
-    if (!source) {
-      return
-    }
+    if (!source) return
 
     const nextKey = createUniqueKey(draft.dataSources, `${sourceKey}_copy`)
     const nextSource = JSON.parse(JSON.stringify(source))
@@ -677,9 +446,7 @@ function deleteDataSource(sourceKey) {
 
 function addAlert() {
   const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
+  if (!sourceKey) return
 
   updateActiveJson((draft) => {
     const alerts = draft.dataSources[sourceKey].alertData
@@ -689,6 +456,7 @@ function addAlert() {
       requiredRules: [],
       timeWindowMillis: 0,
       alertEndpoints: [],
+      aiOverviewEnabled: false,
     }
     selectedKeys.dsAlert = key
   })
@@ -696,16 +464,12 @@ function addAlert() {
 
 function duplicateAlert(alertKey) {
   const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
+  if (!sourceKey) return
 
   updateConfigJson('ds', (draft) => {
     const source = draft.dataSources[sourceKey]
     const alert = source.alertData[alertKey]
-    if (!alert) {
-      return
-    }
+    if (!alert) return
 
     const nextKey = createUniqueKey(source.alertData, `${alertKey}_copy`)
     const nextAlert = JSON.parse(JSON.stringify(alert))
@@ -718,9 +482,7 @@ function duplicateAlert(alertKey) {
 
 function deleteAlert(alertKey) {
   const sourceKey = activeDsSourceKey.value
-  if (!sourceKey) {
-    return
-  }
+  if (!sourceKey) return
 
   updateConfigJson('ds', (draft) => {
     const source = draft.dataSources[sourceKey]
@@ -736,11 +498,7 @@ function addRule() {
     const key = createUniqueKey(draft.rules, 'new_rule')
     draft.rules[key] = {
       ruleName: key,
-      check: {
-        type: 'data_regex_match_check',
-        metricName: '',
-        pattern: '',
-      },
+      check: createCheckDraft('data_regex_match_check'),
       logTargetCount: 1,
       maxCompletionsPerAlert: 1,
     }
@@ -751,9 +509,7 @@ function addRule() {
 function duplicateRule(ruleKey) {
   updateConfigJson('rule', (draft) => {
     const rule = draft.rules[ruleKey]
-    if (!rule) {
-      return
-    }
+    if (!rule) return
 
     const nextKey = createUniqueKey(draft.rules, `${ruleKey}_copy`)
     const nextRule = JSON.parse(JSON.stringify(rule))
@@ -820,10 +576,7 @@ function requestDeleteAlert(alertKey) {
 }
 
 function csvToList(value) {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  return value.split(',').map((item) => item.trim()).filter(Boolean)
 }
 
 function csvToNumberList(value) {
@@ -831,9 +584,7 @@ function csvToNumberList(value) {
 }
 
 function toggleListValue(list, value) {
-  return list.includes(value)
-    ? list.filter((item) => item !== value)
-    : [...list, value]
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 }
 
 function toNumber(value) {
@@ -842,15 +593,22 @@ function toNumber(value) {
 }
 
 function createUniqueKey(collection, base) {
-  if (!collection[base]) {
-    return base
-  }
+  if (!collection[base]) return base
 
   let index = 2
-  while (collection[`${base}_${index}`]) {
-    index += 1
-  }
+  while (collection[`${base}_${index}`]) index += 1
   return `${base}_${index}`
+}
+
+function createCheckDraft(type) {
+  if (type === 'timestamp_check') return { type, before: '', after: '' }
+  if (type === 'log_level_check') return { type, level: 'INFO' }
+  if (type === 'message_length_check') return { type, shorterThan: 0, longerThan: 0 }
+  return { type: 'data_regex_match_check', pattern: '' }
+}
+
+function normalizeDateTimeValue(value) {
+  return value ? value : null
 }
 
 function loadTemplate(key) {
@@ -859,28 +617,40 @@ function loadTemplate(key) {
 }
 
 async function loadBackendConfig() {
-  configLoadStatus.value = 'loading'
-  configLoadError.value = ''
+  if (isMockMode) {
+    for (const [key, value] of Object.entries(starterConfigs)) {
+      editorState[key].text = value
+      editorState[key].lastImportedName = 'Mock starter draft'
+    }
+    return
+  }
 
   try {
-    const bundle = await fetchConfigBundle()
-    for (const key of Object.keys(configMeta)) {
-      if (bundle[key]) {
-        editorState[key].text = JSON.stringify(bundle[key], null, 2)
-        editorState[key].lastImportedName = `mock backend ${configMeta[key].filename}`
-      }
+    const [dataSources, rules] = await Promise.all([
+      fetchControlPlaneDataSources(),
+      fetchControlPlaneRules(),
+    ])
+
+    editorState.ds.text = JSON.stringify({ dataSources }, null, 2)
+    editorState.ds.lastImportedName = 'Backend datasource snapshot'
+    editorState.rule.text = JSON.stringify({ rules }, null, 2)
+    editorState.rule.lastImportedName = 'Backend rule snapshot'
+    editorState.app.text = starterConfigs.app
+    editorState.app.lastImportedName = 'Local starter draft'
+    if (activeConfig.value !== 'app') {
+      editorMode.value = 'raw'
     }
-    configLoadStatus.value = 'loaded'
   } catch (error) {
-    configLoadError.value = error.message ?? 'Failed to load backend config'
-    configLoadStatus.value = 'error'
+    bootstrapError.value = formatApiError(error, 'Failed to load backend config overview.')
+    for (const [key, value] of Object.entries(starterConfigs)) {
+      editorState[key].text = value
+      editorState[key].lastImportedName = 'Local starter draft'
+    }
   }
 }
 
 function downloadActiveConfig() {
-  for (const key of Object.keys(configMeta)) {
-    downloadConfig(key)
-  }
+  for (const key of Object.keys(configMeta)) downloadConfig(key)
   clearSavedDrafts()
 }
 
@@ -923,9 +693,7 @@ function clearSavedDrafts() {
 watch(editorState, saveDrafts, { deep: true })
 
 onMounted(() => {
-  if (!restoredDrafts) {
-    loadBackendConfig()
-  }
+  if (!restoredDrafts) loadBackendConfig()
 })
 
 function requestLoadTemplate() {
@@ -969,19 +737,19 @@ function confirmDestructiveAction() {
 </script>
 
 <template>
-  <main class="mx-auto min-h-screen max-w-[1440px] px-4 py-8 text-ink sm:px-5 sm:py-10">
-    <section class="mb-6 grid gap-6">
+  <section class="grid gap-6">
+    <section class="grid gap-6">
       <AppHeader
         title="Config studio"
-        intro="Edit large JSON configs with structure hints, validation feedback, and local file import before we wire in backend upload."
+        intro="Edit the current Java backend JSON configs with structure hints, validation feedback, and local file import/export."
       />
       <ConfigStatusCards :configs="configStats" :active-config="activeConfig" @select="setActiveConfig" />
-      <p class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-        Config source:
-        <strong class="text-ink">
-          {{ configLoadStatus === 'loaded' ? 'mock /api/config' : configLoadStatus === 'loading' ? 'loading /api/config' : 'local draft' }}
-        </strong>
-        <span v-if="configLoadError" class="ml-2 text-rose-700">{{ configLoadError }}</span>
+      <p v-if="bootstrapError" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        {{ bootstrapError }}
+        <span v-if="!isMockMode"> Showing local fallback drafts until the real API exists.</span>
+      </p>
+      <p v-if="!isMockMode" class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">
+        Datasource and rule tabs load live backend snapshots. They stay in raw mode because the backend schema is richer than the older form editor.
       </p>
     </section>
 
@@ -1032,14 +800,10 @@ function confirmDestructiveAction() {
                 :configured-rules="configuredRules"
                 :selected-keys="selectedKeys"
                 :field-help="fieldHelp"
-                :platform-options="platformOptions"
                 :log-type-options="logTypeOptions"
                 @context-menu="openContextMenu"
                 @add-source="addDataSource"
                 @update-source="updateDsSourceField"
-                @add-option="addDataSourceOption"
-                @update-option="updateDataSourceOption"
-                @delete-option="deleteDataSourceOption"
                 @add-alert="addAlert"
                 @update-alert="updateAlertField"
                 @toggle-alert-rule="toggleAlertRule"
@@ -1126,5 +890,5 @@ function confirmDestructiveAction() {
         Delete
       </button>
     </div>
-  </main>
+  </section>
 </template>

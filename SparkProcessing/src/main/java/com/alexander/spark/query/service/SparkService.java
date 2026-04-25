@@ -2,7 +2,7 @@ package com.alexander.spark.query.service;
 
 import com.alexander.spark.ds.model.DataSource;
 import com.alexander.spark.ds.model.DataSourcePathInfo;
-import com.alexander.spark.settings.GrpcSettings;
+import com.alexander.spark.settings.SparkGrpcConfig;
 import com.alexander.spark.exception.checked.LogParsingException;
 import com.alexander.spark.exception.runtime.QuerySchedulingException;
 import com.alexander.spark.exception.runtime.UnsupportedLogFormatException;
@@ -13,6 +13,8 @@ import com.alexander.spark.log.parser.JsonLogParser;
 import com.alexander.spark.log.parser.LogFmtParser;
 import com.alexander.spark.log.parser.LogParser;
 import com.alexander.spark.log.parser.TableLogParser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FilterFunction;
 import org.apache.spark.api.java.function.MapFunction;
@@ -33,11 +35,11 @@ import java.util.concurrent.TimeoutException;
 public class SparkService implements Serializable {
 //    private static final Logger log = LogManager.getLogger(SparkService.class);
 
-    private final GrpcSettings grpcSettings;
+    private final SparkGrpcConfig grpcSettings;
 
     private final Broadcast<Map<LogType, LogParser>> logParsersBc;
 
-    public SparkService(GrpcSettings grpcSettings, SparkSession sparkSession) {
+    public SparkService(SparkGrpcConfig grpcSettings, SparkSession sparkSession) {
         this.grpcSettings = grpcSettings;
         logParsersBc = initLogParsers(sparkSession);
     }
@@ -66,7 +68,6 @@ public class SparkService implements Serializable {
             try {
                 return logParser.parseLog(row, logFormat);
             } catch (LogParsingException e) {
-//                log.warn("Dropping unparsable log from {}: {}", ds.getName(), e.getMessage());
                 return null;
             }
         }, Encoders.bean(LogEntryDTO.class))

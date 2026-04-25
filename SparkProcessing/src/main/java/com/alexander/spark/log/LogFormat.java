@@ -11,7 +11,10 @@ public record LogFormat(
         Pattern logEntryStartRegex,
         DefaultFields defaultFields,
         Map<String, FieldType> customFields,
-        LogType logType
+        LogType logType,
+        String timestampFieldName,
+        String traceIdFieldName,
+        String spanIdFieldName
 ) implements Serializable {
 
     @Override

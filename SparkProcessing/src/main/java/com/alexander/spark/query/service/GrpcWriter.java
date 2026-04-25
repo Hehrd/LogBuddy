@@ -1,6 +1,6 @@
 package com.alexander.spark.query.service;
 
-import com.alexander.spark.settings.GrpcSettings;
+import com.alexander.spark.settings.SparkGrpcConfig;
 import com.alexander.spark.ingest.IngestRequest;
 import com.alexander.spark.ingest.IngestServiceGrpc;
 import com.alexander.spark.ingest.LogEntry;
@@ -20,11 +20,11 @@ public class GrpcWriter extends ForeachWriter<LogEntryDTO> implements Serializab
     private transient IngestServiceGrpc.IngestServiceStub stub;
 
     private final String dsName;
-    private final GrpcSettings grpcSettings;
+    private final SparkGrpcConfig grpcSettings;
     private transient StreamObserver<IngestRequest> observer;
     private List<LogEntry> buffer;
 
-    public GrpcWriter(String dsName, GrpcSettings grpcSettings) {
+    public GrpcWriter(String dsName, SparkGrpcConfig grpcSettings) {
         this.dsName = dsName;
         this.grpcSettings = grpcSettings;
         this.stub = null;

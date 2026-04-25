@@ -1,43 +1,42 @@
 package com.alexander.processing.service.rule.check;
 
-import com.alexander.processing.model.log.LogFormat;
-import com.alexander.processing.model.rule.Rule;
+import com.alexander.processing.model.dto.LogEntryDTO;
 import com.alexander.processing.model.rule.ProcessingSession;
-import com.alexander.processing.model.rule.check.TimestampCheck;
-import com.alexander.processing.service.alert.AlertingService;
-import com.alexander.processing.ingest.LogEntry;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.alexander.processing.model.rule.check.TimestampValueCheck;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 @Component
-public class TimestampCheckExecutor extends CheckExecutor {
+public class TimestampCheckExecutor extends CheckExecutor<TimestampValueCheck> {
 
-    @Autowired
-    protected TimestampCheckExecutor(AlertingService alertingService) {
-        super(TimestampCheck.class, alertingService);
+    @Override
+    public Class<TimestampValueCheck> getCheckClass() {
+        return TimestampValueCheck.class;
     }
 
     @Override
-    public boolean executeCheck(Rule rule, LogEntry logEntry, LogFormat logFormat, ProcessingSession processingSession) {
-        TimestampCheck check = (TimestampCheck) rule.check();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(logFormat.defaultFields().getTimestampFormat());
-        LocalDateTime localDateTime = LocalDateTime.parse(logEntry.getTimestamp(), formatter);
-        Instant timestamp = localDateTime.atZone(ZoneId.systemDefault()).toInstant();
-        boolean before = true;
-        boolean after = true;
-        if (check.before() != null) {
-            before = timestamp.isBefore(check.before());
+    public boolean executeCheck(TimestampValueCheck check, LogEntryDTO logEntry, ProcessingSession processingSession) {
+        for (Map.Entry<String, TimestampValueCheck.TimestampValueInfo> fieldCheck : check.values().entrySet()) {
+            String fieldName = fieldCheck.getKey();
+            TimestampValueCheck.TimestampValueInfo valueInfo = fieldCheck.getValue();
+
+            Instant fieldValue;
+            try {
+                fieldValue = Instant.parse(logEntry.fields().get(fieldName));
+            } catch (Exception e) {
+                return false; // Field value is not a valid timestamp
+            }
+
+            if (valueInfo.before() != null && !fieldValue.isBefore(valueInfo.before())) {
+                return false; // Timestamp is not before the specified time
+            }
+            if (valueInfo.after() != null && !fieldValue.isAfter(valueInfo.after())) {
+                return false; // Timestamp is not after the specified time
+            }
         }
-        if (check.after() != null) {
-            after = timestamp.isAfter(check.after());
-        }
-        return  before && after;
+
+        return true;
     }
-
-
 }

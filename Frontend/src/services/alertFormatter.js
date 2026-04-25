@@ -1,6 +1,12 @@
 export function normalizeAlert(rawAlert) {
-  if (Array.isArray(rawAlert.data)) {
-    const rules = rawAlert.data
+  const completions = Array.isArray(rawAlert.completions)
+    ? rawAlert.completions
+    : Array.isArray(rawAlert.data)
+      ? rawAlert.data
+      : []
+
+  if (completions.length) {
+    const rules = completions
       .filter(Boolean)
       .map((completion) => ({
         name: completion.ruleName,
@@ -9,14 +15,22 @@ export function normalizeAlert(rawAlert) {
       }))
 
     return {
-      id: rawAlert.id ?? `alert-${rawAlert.timestamp ?? Date.now()}`,
+      id: rawAlert.alertId ?? rawAlert.id ?? `alert-${rawAlert.triggeredAt ?? rawAlert.timestamp ?? Date.now()}`,
       severity: rules.some((rule) => rule.name?.toLowerCase().includes('error')) ? 'critical' : 'warning',
       alertName: rawAlert.alertName ?? 'Backend alert',
-      sourceName: rawAlert.sourceName ?? 'DataProcessing',
-      ruleNames: rules.map((rule) => rule.name).filter(Boolean),
+      alertType: rawAlert.alertType ?? 'UNKNOWN',
+      sourceName: rawAlert.dataSourceName ?? rawAlert.sourceName ?? 'DataProcessing',
+      traceId: rawAlert.traceId ?? '',
+      ruleNames: rawAlert.requiredRules?.length ? rawAlert.requiredRules : rules.map((rule) => rule.name).filter(Boolean),
       message: `${rules.length} rule${rules.length === 1 ? '' : 's'} completed for this alert.`,
       matchedCount: rules.reduce((total, rule) => total + rule.logs.length, 0),
-      occurredAt: rawAlert.timestamp ?? new Date().toISOString(),
+      occurredAt: rawAlert.triggeredAt ?? rawAlert.timestamp ?? new Date().toISOString(),
+      firstMatchedAt: rawAlert.firstMatchedAt ?? '',
+      lastMatchedAt: rawAlert.lastMatchedAt ?? '',
+      timeWindowMillis: rawAlert.timeWindowMillis ?? null,
+      aiOverviewEnabled: Boolean(rawAlert.aiOverviewEnabled),
+      sampleLogs: rawAlert.sampleLogs ?? [],
+      completions: rules,
       rawAlert,
     }
   }
@@ -24,7 +38,7 @@ export function normalizeAlert(rawAlert) {
   return {
     ...rawAlert,
     ruleNames: rawAlert.ruleNames ?? [rawAlert.ruleName].filter(Boolean),
-    occurredAt: rawAlert.occurredAt ?? rawAlert.timestamp ?? new Date().toISOString(),
+    occurredAt: rawAlert.occurredAt ?? rawAlert.triggeredAt ?? rawAlert.timestamp ?? new Date().toISOString(),
     matchedCount: rawAlert.matchedCount ?? rawAlert.logs?.length ?? 0,
     rawAlert,
   }

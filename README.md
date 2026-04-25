@@ -2,11 +2,12 @@
 
 ## Overview
 
-LogBuddy is a log-ingestion and rule-based alerting system built as three Java microservices:
+LogBuddy is a log-ingestion and rule-based alerting system built around three backend services plus a separate frontend:
 
 1. `SparkProcessing` reads logs from streaming or file-based sources with Apache Spark Structured Streaming.
 2. `DataProcessing` receives parsed log batches over gRPC, evaluates configurable rules, and sends alerts to HTTP endpoints.
 3. `ControlPanel` appears intended to be a small HTTP gateway for controlling the other services, but it is currently incomplete.
+4. `Frontend` is a Vite + Vue application for dashboards, alerts, and config editing.
 
 The project solves a common operational problem: collecting logs from multiple platforms, normalizing them into a common structure, checking them against detection rules, and triggering alerts when combinations of rule conditions are met.
 
@@ -15,6 +16,7 @@ At a high level:
 - Spark handles ingestion and parsing.
 - A Spring Boot service handles rule evaluation and alert dispatch.
 - A lightweight control layer is intended to expose operational endpoints such as health, reload, sleep/wake, and query listing/stopping.
+- A Vue frontend consumes live alerts over WebSocket and offers UI flows for config and monitoring.
 
 ## Architecture
 
@@ -179,10 +181,14 @@ service IngestService {
 
 The rule engine currently supports these check types:
 
-- `LogLevelCheck`
-- `DataRegexMatchCheck`
-- `MessageLengthCheck`
-- `TimestampCheck`
+- `string_value_check`
+- `numeric_value_check`
+- `data_regex_match_check`
+- `timestamp_check`
+- `duplicate_event_check`
+- `fields_change_check`
+
+`fields_change_check` is trace-oriented. It now evaluates event pairs, not isolated field hits across the whole trace. A trace matches only when one compared pair satisfies all configured field transition rules together.
 
 #### Configuration expectations
 
@@ -196,7 +202,7 @@ From the settings models, these files appear to contain:
 
 - `ds.conf`: data sources, log formats, required rules, alert definitions, schedules
 - `rule.conf`: named rules and their check definitions
-- `app.conf`: `controlPanelServerPort` and `grpcSettings`
+- `app.conf`: `grpcSettings`, Spark runtime mode, and optional Spark K8s settings
 
 ### Service 3: SparkProcessing
 
@@ -241,10 +247,10 @@ It also starts a small embedded HTTP server for runtime controls such as reloadi
 
 HTTP endpoints exposed by the embedded server:
 
-- `GET /control-plane/status`
-- `GET /control-plane/reload-config`
-- `GET /control-plane/terminate-query` with header `Query-Id: <data-source-name>`
-- `GET /control-plane/list-queries`
+- `GET /control-panel/status`
+- `GET /control-panel/reload-config`
+- `GET /control-panel/terminate-query` with header `Query-Id: <data-source-name>`
+- `GET /control-panel/list-queries`
 
 Behavior notes:
 
@@ -371,12 +377,9 @@ There are no sample config files in the repository, so this example is inferred 
 
 ```json
 {
-  "serverPort": 8081,
-  "controlPanelServerPort": 8080,
   "isInK8sMode": false,
   "grpcSettings": {
     "serverHost": "localhost",
-    "serverPort": 9090,
     "maxLinesPerReq": 100
   },
   "sparkK8sSettings": null
@@ -385,8 +388,8 @@ There are no sample config files in the repository, so this example is inferred 
 
 Notes:
 
-- `SparkProcessing` consumes `serverPort`, `grpcSettings`, `isInK8sMode`, and `sparkK8sSettings`.
-- `DataProcessing` consumes `controlPanelServerPort` and `grpcSettings`.
+- `SparkProcessing` consumes `grpcSettings`, `isInK8sMode`, and `sparkK8sSettings`.
+- `DataProcessing` consumes `grpcSettings`.
 - Both services disable Jackson's unknown-property failures, so a shared `app.conf` can contain the union of both models.
 
 #### Example `ds.conf`
@@ -416,16 +419,30 @@ Notes:
           "logger": "logger"
         },
         "customFields": {
-          "requestId": "STRING"
+          "requestId": "TEXT",
+          "statusCode": "NUMERIC",
+          "retryCount": "NUMERIC"
         }
       },
-      "requiredRules": ["error-level-rule"],
-      "alertData": {
+      "globalRequiredRules": ["error_regex_rule"],
+      "traceRequiredRules": ["user_status_transition_rule"],
+      "globalAlertConditions": {
         "error-alert": {
           "alertName": "error-alert",
-          "requiredRules": ["error-level-rule"],
+          "requiredRules": ["error_regex_rule"],
           "timeWindowMillis": 60000,
           "alertEndpoints": ["http://localhost:9000/webhook"],
+          "alertConditionType": "GLOBAL",
+          "aiOverviewEnabled": false
+        }
+      },
+      "traceAlertConditions": {
+        "trace-change-alert": {
+          "alertName": "trace-change-alert",
+          "requiredRules": ["user_status_transition_rule"],
+          "timeWindowMillis": 60000,
+          "alertEndpoints": ["http://localhost:9000/webhook"],
+          "alertConditionType": "PER_LOG_TRACE",
           "aiOverviewEnabled": false
         }
       },
@@ -443,18 +460,91 @@ Notes:
 - `SparkProcessing` reads `pathInfo`.
 - `DataProcessing` reads `path`.
 - Because both services ignore unknown JSON properties, one shared `ds.conf` can carry both fields.
+- `DataProcessing` expects `globalRequiredRules`, `traceRequiredRules`, `globalAlertConditions`, and `traceAlertConditions`.
 
 #### Example `rule.conf`
 
 ```json
 {
   "rules": {
-    "error-level-rule": {
-      "ruleName": "error-level-rule",
-      "check": {
-        "type": "log_level_check",
-        "level": "ERROR"
-      },
+    "error_regex_rule": {
+      "ruleName": "error_regex_rule",
+      "checks": [
+        {
+          "type": "data_regex_match_check",
+          "fields": {
+            "msg": {
+              "matches": ".*ERROR.*",
+              "notMatches": null
+            }
+          }
+        }
+      ],
+      "logTargetCount": 1,
+      "maxCompletionsPerAlert": 1
+    },
+    "user_status_transition_rule": {
+      "ruleName": "user_status_transition_rule",
+      "checks": [
+        {
+          "type": "fields_change_check",
+          "fields": {
+            "userId": {
+              "mode": "CHANGED",
+              "previousCheck": {
+                "type": "string_value_check",
+                "values": {
+                  "userId": {
+                    "equalTo": "anonymous",
+                    "notEqualTo": null,
+                    "longerThan": 0,
+                    "shorterThan": 0
+                  }
+                }
+              },
+              "currentCheck": {
+                "type": "string_value_check",
+                "values": {
+                  "userId": {
+                    "equalTo": null,
+                    "notEqualTo": "anonymous",
+                    "longerThan": 0,
+                    "shorterThan": 0
+                  }
+                }
+              }
+            },
+            "statusCode": {
+              "mode": "CHANGED",
+              "previousCheck": {
+                "type": "numeric_value_check",
+                "values": {
+                  "statusCode": {
+                    "lessThan": null,
+                    "moreThan": null,
+                    "equalTo": 401,
+                    "notEqualTo": null,
+                    "divisibleBy": null
+                  }
+                }
+              },
+              "currentCheck": {
+                "type": "numeric_value_check",
+                "values": {
+                  "statusCode": {
+                    "lessThan": null,
+                    "moreThan": null,
+                    "equalTo": 200,
+                    "notEqualTo": null,
+                    "divisibleBy": null
+                  }
+                }
+              }
+            }
+          },
+          "strategy": "COMPARE_TO_PREVIOUS_EVENT"
+        }
+      ],
       "logTargetCount": 1,
       "maxCompletionsPerAlert": 1
     }
@@ -462,12 +552,16 @@ Notes:
 }
 ```
 
-The `check.type` discriminator values defined in code are:
+The `checks[].type` discriminator values defined in code are:
 
-- `log_level_check`
+- `string_value_check`
+- `numeric_value_check`
 - `data_regex_match_check`
-- `message_length_check`
 - `timestamp_check`
+- `duplicate_event_check`
+- `fields_change_check`
+
+For `fields_change_check`, each configured field is evaluated against the same `(referenceEvent, currentEvent)` pair selected by `strategy`.
 
 ### How to run each service
 
@@ -480,6 +574,7 @@ mvn spring-boot:run
 
 Expected defaults:
 
+- HTTP server port: `6969` from `application.properties`
 - gRPC server port: `9090` from `application.properties`
 - Config files:
   - `/opt/logbuddy/config/ds.conf`
@@ -498,32 +593,61 @@ Notes:
 
 - The final shaded JAR name should be `target/spark-processing.jar` because `finalName` is `spark-processing`.
 - The service starts Spark locally with `local[*]`.
-- It also starts an embedded HTTP server on the `serverPort` value from `app.conf`.
+- It also starts an embedded HTTP server on port `16000` from `Main.java`.
 
 #### Run ControlPanel
 
-The current codebase does not contain a runnable Spring Boot bootstrap class for this service, so these instructions are tentative:
+The service now has a Spring Boot bootstrap class and an explicit HTTP port.
 
 ```bash
 cd ControlPanel
 mvn clean package
 ```
 
-Before this service can run properly, it likely needs:
+Expected defaults:
 
-- `@SpringBootApplication` in `Main.java`
-- a valid server port configuration
-- proper downstream base URLs including `http://` and ports
-- endpoint path alignment with `SparkProcessing`
+- HTTP server port: `8080` from `application.properties`
+- Downstream DataProcessing base URL: `http://localhost:6969/control-panel`
+- Downstream SparkProcessing base URL: `http://localhost:16000/control-panel`
 
 ## Usage
 
-Because `ControlPanel` is incomplete, the most reliable usage examples are against `DataProcessing` and `SparkProcessing` directly.
+### Alert payload shape
+
+`DataProcessing` currently emits alerts with this high-level structure:
+
+```json
+{
+  "alertId": "uuid",
+  "alertName": "trace-change-alert",
+  "alertType": "PER_LOG_TRACE",
+  "dataSourceName": "app-logs",
+  "traceId": "trace-123",
+  "triggeredAt": "2026-04-25T09:20:00Z",
+  "firstMatchedAt": "2026-04-25T09:18:00Z",
+  "lastMatchedAt": "2026-04-25T09:19:30Z",
+  "timeWindowMillis": 60000,
+  "requiredRules": ["user_status_transition_rule"],
+  "completions": [
+    {
+      "ruleName": "user_status_transition_rule",
+      "timestamp": "2026-04-25T09:19:30Z",
+      "logs": ["..."]
+    }
+  ],
+  "sampleLogs": ["..."],
+  "aiOverviewEnabled": false
+}
+```
+
+Consumers should prefer `completions` over the old `data` field name. Some frontend/mock code in the repo still assumes the older payload and should be aligned before treating the UI as production-ready.
+
+The direct service examples below reflect the current hardcoded ports and control-panel route naming.
 
 ### Check DataProcessing health
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/health
+curl -i http://localhost:6969/control-panel/health
 ```
 
 Expected response:
@@ -532,12 +656,12 @@ Expected response:
 HTTP/1.1 200 OK
 ```
 
-The exact HTTP port is not explicit in `application.properties`, so unless another config overrides it, Spring Boot default port `8080` is the most likely assumption.
+`DataProcessing` hardcodes its HTTP port in `application.properties` as `6969`.
 
 ### Put DataProcessing to sleep
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/sleep
+curl -i http://localhost:6969/control-panel/sleep
 ```
 
 Expected behavior:
@@ -548,13 +672,13 @@ Expected behavior:
 ### Wake DataProcessing back up
 
 ```bash
-curl -i http://localhost:8080/api/control-panel/wake
+curl -i http://localhost:6969/control-panel/wake
 ```
 
 ### Check SparkProcessing status
 
 ```bash
-curl -i http://localhost:8081/control-plane/status
+curl -i http://localhost:16000/control-panel/status
 ```
 
 Expected response:
@@ -565,12 +689,12 @@ HTTP/1.1 200 OK
 
 Assumption:
 
-- `8081` is just an example. Use the `serverPort` value from `app.conf`.
+- `16000` is the hardcoded SparkProcessing HTTP port in `Main.java`.
 
 ### List active Spark queries
 
 ```bash
-curl -i http://localhost:8081/control-plane/list-queries
+curl -i http://localhost:16000/control-panel/list-queries
 ```
 
 Expected response:
@@ -582,7 +706,7 @@ Expected response:
 ### Reload Spark config
 
 ```bash
-curl -i http://localhost:8081/control-plane/reload-config
+curl -i http://localhost:16000/control-panel/reload-config
 ```
 
 Expected behavior:
@@ -594,7 +718,7 @@ Expected behavior:
 ### Stop a Spark query
 
 ```bash
-curl -i -H "Query-Id: app-logs" http://localhost:8081/control-plane/terminate-query
+curl -i -H "Query-Id: app-logs" http://localhost:16000/control-panel/terminate-query
 ```
 
 Expected behavior:
@@ -607,21 +731,18 @@ Expected behavior:
 ### Assumptions made
 
 - The project title should remain `LogBuddy`, based on the root README, package names, Spark app name, and config paths.
-- `ControlPanel` is intended to be a Spring Boot API gateway, even though its bootstrap class is unfinished.
-- `DataProcessing` REST API likely runs on Spring Boot default port `8080` unless `server.port` is supplied externally.
-- `SparkProcessing` runs its HTTP API on `app.conf.serverPort`.
+- `ControlPanel` is a Spring Boot API gateway.
+- `DataProcessing` REST API runs on port `6969` from `application.properties`.
+- `SparkProcessing` runs its HTTP API on port `16000` from `Main.java`.
 - Config files are JSON, even though they use `.conf` extensions.
 
 ### Unclear or inconsistent parts
 
-- `ControlPanel` is incomplete and currently not runnable as a real microservice.
-- `ControlPanel` endpoint names do not match the endpoint names implemented by `SparkProcessing`.
 - `SparkProcessing` controller path matching uses `getRequestURI().getHost()` in a way that may not behave as intended.
-- `DataProcessing` has `controlPanelServerPort` in config, but its REST server port is not directly wired from that field in the visible code.
 - `DataSource.path` exists in `DataProcessing` while `SparkProcessing` uses `pathInfo`; the current setup relies on both services ignoring unknown JSON properties so one file can contain both shapes.
 - `DataProcessing/Dockerfile` looks inconsistent:
   - it copies `build/logBuddyProcessing-exec.jar`
-  - it exposes port `6969`
+  - it still appears to reference jar names inconsistently
   - it runs `logBuddy-exec.jar`
   These names do not match each other cleanly.
 
@@ -694,4 +815,4 @@ LogBuddy/
 - Standardize API naming:
   - `reload-config` vs `reload-settings`
   - `terminate-query` vs `stop-query`
-  - `control-plane` vs `control-panel`
+  - older docs and code paths used mixed route naming before the current `control-panel` standard

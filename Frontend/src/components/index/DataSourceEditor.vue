@@ -11,7 +11,6 @@ defineProps({
   configuredRules: Array,
   selectedKeys: Object,
   fieldHelp: Object,
-  platformOptions: Array,
   logTypeOptions: Array,
 })
 
@@ -19,9 +18,6 @@ defineEmits([
   'context-menu',
   'add-source',
   'update-source',
-  'add-option',
-  'update-option',
-  'delete-option',
   'add-alert',
   'update-alert',
   'toggle-alert-rule',
@@ -53,33 +49,10 @@ defineEmits([
           <HelpLabel label="Source name" :help="fieldHelp.sourceName" />
           <input :value="activeDsSource.name" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-source', 'name', $event.target.value)" />
         </label>
-        <label class="grid gap-1 text-sm">
-          <HelpLabel label="Platform" :help="fieldHelp.platform" />
-          <select :value="activeDsSource.pathInfo?.platform" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @change="$emit('update-source', 'platform', $event.target.value)">
-            <option v-for="option in platformOptions" :key="option" :value="option">{{ option }}</option>
-          </select>
-        </label>
         <label class="grid gap-1 text-sm md:col-span-2">
-          <HelpLabel label="Location" :help="fieldHelp.location" />
-          <input :value="activeDsSource.pathInfo?.location" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-source', 'location', $event.target.value)" />
+          <HelpLabel label="Path" :help="fieldHelp.path" />
+          <input :value="activeDsSource.path" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-source', 'path', $event.target.value)" />
         </label>
-
-        <div class="grid gap-2 text-sm md:col-span-2">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <HelpLabel label="Options" :help="fieldHelp.options" />
-            <button type="button" class="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600" @click="$emit('add-option')">
-              Add option
-            </button>
-          </div>
-          <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3">
-            <div v-for="[optionKey, optionValue] in Object.entries(activeDsSource.pathInfo?.options ?? {})" :key="optionKey" class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-              <input :value="optionKey" aria-label="Option key" class="rounded-lg border border-slate-300 bg-white px-3 py-2" placeholder="key" @input="$emit('update-option', optionKey, $event.target.value, optionValue)" />
-              <input :value="optionValue" aria-label="Option value" class="rounded-lg border border-slate-300 bg-white px-3 py-2" placeholder="value" @input="$emit('update-option', optionKey, optionKey, $event.target.value)" />
-              <button type="button" class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700" @click="$emit('delete-option', optionKey)">Delete</button>
-            </div>
-            <p v-if="!Object.keys(activeDsSource.pathInfo?.options ?? {}).length" class="text-sm text-slate-500">No connector options yet.</p>
-          </div>
-        </div>
 
         <label class="grid gap-1 text-sm">
           <HelpLabel label="Log type" :help="fieldHelp.logType" />
@@ -99,6 +72,10 @@ defineEmits([
         <label class="grid gap-1 text-sm">
           <HelpLabel label="Startup delay" :help="fieldHelp.startupDelay" />
           <input :value="activeDsSource.schedule?.delayAfterStartUpMillis" type="number" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-source', 'delayAfterStartUpMillis', $event.target.value)" />
+        </label>
+        <label class="grid gap-1 text-sm">
+          <HelpLabel label="Intervals millis" :help="fieldHelp.intervalsMillis" />
+          <input :value="(activeDsSource.schedule?.intervalsMillis ?? []).join(', ')" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-source', 'intervalsMillis', $event.target.value)" />
         </label>
       </div>
 
@@ -144,6 +121,10 @@ defineEmits([
           <label class="grid gap-1 text-sm md:col-span-2">
             <HelpLabel label="Alert endpoints" :help="fieldHelp.alertEndpoints" />
             <input :value="(activeDsAlert.alertEndpoints ?? []).join(', ')" class="rounded-lg border border-slate-300 bg-white px-3 py-2" @input="$emit('update-alert', 'alertEndpoints', $event.target.value)" />
+          </label>
+          <label class="flex items-center gap-3 text-sm md:col-span-2">
+            <input :checked="Boolean(activeDsAlert.aiOverviewEnabled)" type="checkbox" class="h-4 w-4 rounded border-slate-300" @change="$emit('update-alert', 'aiOverviewEnabled', $event.target.checked)" />
+            <HelpLabel label="AI overview enabled" :help="fieldHelp.aiOverviewEnabled" />
           </label>
         </div>
       </div>

@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 
 public class Main {
     private static final Logger log = LogManager.getLogger(Main.class);
+    private static final int HTTP_PORT = 16000;
 
     private static SparkService sparkService;
     private static QueryScheduler queryScheduler;
@@ -38,14 +39,13 @@ public class Main {
 
     private static void runWebServer(RuntimeContext rc) {
         try {
-            HttpServer server = HttpServer.create(new InetSocketAddress(rc.getAppSettings().appConfigurationSettings().serverPort()),
-                    0);
+            HttpServer server = HttpServer.create(new InetSocketAddress(HTTP_PORT), 0);
             initControllers(server);
             server.setExecutor(Executors.newSingleThreadExecutor());
             server.start();
-            log.info("Control panel web server started on port {}", rc.getAppSettings().appConfigurationSettings().serverPort());
+            log.info("Control plane web server started on port {}", HTTP_PORT);
         } catch (IOException e) {
-            throw new WebServerStartupException("Failed to start control panel web server", e);
+            throw new WebServerStartupException("Failed to start control plane web server", e);
         }
     }
 

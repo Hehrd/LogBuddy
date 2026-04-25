@@ -1,11 +1,11 @@
 package com.alexander.processing.context;
 
 import com.alexander.processing.model.ds.DataSource;
-import com.alexander.processing.model.rule.AlertData;
-import com.alexander.processing.model.rule.AlertSession;
+import com.alexander.processing.model.rule.AlertCondition;
+import com.alexander.processing.model.rule.AlertConditionSession;
 import com.alexander.processing.model.rule.ProcessingSession;
 import com.alexander.processing.model.rule.RuleSession;
-import com.alexander.processing.settings.AppSettings;
+import com.alexander.processing.settings.ProcessingRuntimeSettings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ public class ProcessingContext {
     private final Map<String, ProcessingSession> processingSessions = new HashMap<>();
 
     @Autowired
-    public ProcessingContext(AppSettings appSettings) {
+    public ProcessingContext(ProcessingRuntimeSettings appSettings) {
         Collection<DataSource> dataSources = appSettings.dataSourceSettings().dataSources().values();
         for (DataSource dataSource : dataSources) {
             ProcessingSession processingSession = createProcessingSession(dataSource);
@@ -30,22 +30,27 @@ public class ProcessingContext {
         return processingSessions.get(dataSourceName);
     }
 
+    public Map<String, ProcessingSession> getProcessingSessions() {
+        return Map.copyOf(processingSessions);
+    }
+
     private ProcessingSession createProcessingSession(DataSource ds) {
+        return new ProcessingSession(
+                createRuleSessions(ds.globalAlertConditions()),
+                new HashMap<>(),
+                ds.traceAlertConditions());
+    }
+
+    private Map<String, RuleSession> createRuleSessions(Map<String, AlertCondition> alertConditions) {
         Map<String, RuleSession> ruleSessions = new HashMap<>();
-        for (AlertData alertData : ds.alertData().values()) {
-            AlertSession alertSession = new AlertSession(alertData);
-            for (String ruleName : alertData.requiredRules()) {
-                if (ruleSessions.containsKey(ruleName)) {
-                    RuleSession ruleSession = ruleSessions.get(ruleName);
-                    ruleSession.addAlertSession(alertSession);
-                    continue;
-                }
-                Map<String, AlertSession> alertSessions = new HashMap<>();
-                alertSessions.put(alertSession.getAlertName(), alertSession);
-                ruleSessions.put(ruleName, new RuleSession(ruleName,alertSessions));
+        for (AlertCondition alertCondition : alertConditions.values()) {
+            AlertConditionSession alertConditionSession = new AlertConditionSession(alertCondition);
+            for (String ruleName : alertCondition.requiredRules()) {
+                RuleSession ruleSession = ruleSessions.computeIfAbsent(ruleName, ignored -> new RuleSession(ruleName, new HashMap<>()));
+                ruleSession.addAlertSession(alertConditionSession);
             }
         }
-        return new ProcessingSession(ruleSessions);
+        return ruleSessions;
     }
 
 }

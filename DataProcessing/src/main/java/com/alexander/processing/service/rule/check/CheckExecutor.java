@@ -1,26 +1,12 @@
 package com.alexander.processing.service.rule.check;
 
-import com.alexander.processing.model.log.LogFormat;
-import com.alexander.processing.model.rule.Rule;
+import com.alexander.processing.model.dto.LogEntryDTO;
 import com.alexander.processing.model.rule.ProcessingSession;
 import com.alexander.processing.model.rule.check.Check;
-import com.alexander.processing.service.alert.AlertingService;
-import com.alexander.processing.ingest.LogEntry;
-import lombok.Getter;
 
-public abstract class CheckExecutor {
-    protected AlertingService alertingService;
+public abstract class CheckExecutor<T extends Check> {
 
-    @Getter
-    protected Class<? extends Check> checkClass;
+    public abstract Class<T> getCheckClass();
 
-    protected CheckExecutor(Class<? extends Check> checkClass, AlertingService alertingService) {
-        this.checkClass = checkClass;
-        this.alertingService = alertingService;
-    }
-
-
-    public abstract boolean executeCheck(Rule rule, LogEntry logEntry, LogFormat logFormat, ProcessingSession processingSession);
-
-
+    public abstract boolean executeCheck(T check, LogEntryDTO logEntry, ProcessingSession processingSession);
 }
