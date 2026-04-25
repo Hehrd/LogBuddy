@@ -8,7 +8,12 @@ export function resolveBackendUrl(path) {
 }
 
 export function resolveBackendWebSocketUrl(path) {
-  const url = new URL(resolveBackendUrl(path))
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
+  const configuredWebSocketBase = import.meta.env.VITE_ALERTS_WS_URL
+  if (configuredWebSocketBase) {
+    return new URL(configuredWebSocketBase, window.location.origin).toString()
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = `${window.location.hostname}:6969`
+  return new URL(path, `${protocol}//${host}`).toString()
 }
