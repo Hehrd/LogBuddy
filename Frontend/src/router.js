@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AlertsPage from './pages/AlertsPage.vue'
 import ConfigPage from './pages/ConfigPage.vue'
+import DataSourcesPage from './pages/DataSourcesPage.vue'
+import RulesPage from './pages/RulesPage.vue'
 import ServiceInfoPage from './pages/ServiceInfoPage.vue'
 
 export const router = createRouter({
@@ -13,6 +15,14 @@ export const router = createRouter({
     {
       path: '/config',
       component: ConfigPage,
+    },
+    {
+      path: '/datasources',
+      component: DataSourcesPage,
+    },
+    {
+      path: '/rules',
+      component: RulesPage,
     },
     {
       path: '/alerts',

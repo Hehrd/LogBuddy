@@ -270,6 +270,20 @@ onBeforeUnmount(() => {
           Info
         </RouterLink>
         <RouterLink
+          to="/datasources"
+          class="rounded-lg border px-4 py-2 transition-colors"
+          :class="$route.path === '/datasources' ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"
+        >
+          Datasources
+        </RouterLink>
+        <RouterLink
+          to="/rules"
+          class="rounded-lg border px-4 py-2 transition-colors"
+          :class="$route.path === '/rules' ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"
+        >
+          Rules
+        </RouterLink>
+        <RouterLink
           to="/alerts"
           class="rounded-lg border px-4 py-2 transition-colors"
           :class="$route.path === '/alerts' ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"

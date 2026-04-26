@@ -3,6 +3,8 @@ import { mockConfigDrafts } from './mockData.js'
 
 const dataSources = JSON.parse(mockConfigDrafts.ds).dataSources
 const rules = JSON.parse(mockConfigDrafts.rule).rules
+const dataSourceCount = Object.keys(dataSources).length
+const ruleCount = Object.keys(rules).length
 
 export const handlers = [
   http.get('/control-panel/health', () => HttpResponse.json({
@@ -13,14 +15,14 @@ export const handlers = [
     spark: {
       service: 'spark-processing',
       sleeping: false,
-      queryCount: dataSources.length,
-      dataSourceCount: dataSources.length,
+      queryCount: dataSourceCount,
+      dataSourceCount,
     },
     data: {
       service: 'data-processing',
       sleeping: false,
-      dataSourceCount: 3,
-      ruleCount: 7,
+      dataSourceCount,
+      ruleCount,
     },
   })),
   http.get('/control-panel/datasources', () => HttpResponse.json(dataSources)),

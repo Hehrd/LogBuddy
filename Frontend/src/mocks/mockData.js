@@ -58,6 +58,133 @@ export const mockConfigDrafts = {
           300000
         ]
       }
+    },
+    "audit-logs": {
+      "name": "audit-logs",
+      "pathInfo": {
+        "location": "/var/log/audit.log",
+        "platform": "FILE",
+        "options": {
+          "maxFilesPerTrigger": "5"
+        }
+      },
+      "logFormat": {
+        "logType": "JSON",
+        "keyValuePairRegex": "",
+        "fullLogEntryRegex": "",
+        "logEntryStartRegex": "^\\\\{",
+        "defaultFields": {
+          "timestamp": "timestamp",
+          "timestampFormat": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+          "level": "severity",
+          "message": "message",
+          "source": "service",
+          "data": "payload",
+          "logger": "logger"
+        },
+        "customFields": {
+          "actor": "user.id",
+          "action": "event.action",
+          "ip": "client.ip"
+        }
+      },
+      "globalRequiredRules": [
+        "suspicious-admin-access"
+      ],
+      "traceRequiredRules": [
+        "duplicate_event_check"
+      ],
+      "globalAlertConditions": {
+        "admin-access-alert": {
+          "alertName": "admin-access-alert",
+          "requiredRules": [
+            "suspicious-admin-access"
+          ],
+          "timeWindowMillis": 300000,
+          "alertEndpoints": [
+            "http://alerts.internal/audit"
+          ],
+          "alertConditionType": "GLOBAL",
+          "aiOverviewEnabled": false
+        }
+      },
+      "traceAlertConditions": {
+        "duplicate-audit-event": {
+          "alertName": "duplicate-audit-event",
+          "requiredRules": [
+            "duplicate_event_check"
+          ],
+          "timeWindowMillis": 120000,
+          "alertEndpoints": [
+            "http://alerts.internal/audit-trace"
+          ],
+          "alertConditionType": "TRACE",
+          "aiOverviewEnabled": true
+        }
+      },
+      "schedule": {
+        "delayAfterStartUpMillis": 5000,
+        "intervalsMillis": [
+          120000
+        ]
+      }
+    },
+    "auth-service-prod": {
+      "name": "auth-service-prod",
+      "pathInfo": {
+        "location": "kafka://auth-events",
+        "platform": "KAFKA",
+        "options": {
+          "bootstrapServers": "kafka:9092",
+          "startingOffsets": "latest"
+        }
+      },
+      "logFormat": {
+        "logType": "LOGFMT",
+        "keyValuePairRegex": "(\\\\w+)=([^ ]+)",
+        "fullLogEntryRegex": ".*",
+        "logEntryStartRegex": "^ts=",
+        "defaultFields": {
+          "timestamp": "ts",
+          "timestampFormat": "yyyy-MM-dd HH:mm:ss",
+          "level": "level",
+          "message": "msg",
+          "source": "service",
+          "data": "payload",
+          "logger": "logger"
+        },
+        "customFields": {
+          "user": "user",
+          "ip": "ip"
+        }
+      },
+      "globalRequiredRules": [
+        "failed-login-threshold",
+        "repeated-ip-attempts"
+      ],
+      "traceRequiredRules": [],
+      "globalAlertConditions": {
+        "credential-abuse": {
+          "alertName": "credential-abuse",
+          "requiredRules": [
+            "failed-login-threshold",
+            "repeated-ip-attempts"
+          ],
+          "timeWindowMillis": 300000,
+          "alertEndpoints": [
+            "http://alerts.internal/auth"
+          ],
+          "alertConditionType": "GLOBAL",
+          "aiOverviewEnabled": true
+        }
+      },
+      "traceAlertConditions": {},
+      "schedule": {
+        "delayAfterStartUpMillis": 0,
+        "intervalsMillis": [
+          30000
+        ]
+      }
     }
   }
 }`,
@@ -85,6 +212,39 @@ export const mockConfigDrafts = {
       ],
       "logTargetCount": 1,
       "maxCompletionsPerAlert": 100
+    },
+    "duplicate_event_check": {
+      "ruleName": "duplicate_event_check",
+      "checks": [
+        {
+          "type": "duplicate_event_check"
+        }
+      ],
+      "logTargetCount": 2,
+      "maxCompletionsPerAlert": 5
+    },
+    "failed-login-threshold": {
+      "ruleName": "failed-login-threshold",
+      "checks": [
+        {
+          "type": "string_value_check"
+        },
+        {
+          "type": "numeric_value_check"
+        }
+      ],
+      "logTargetCount": 3,
+      "maxCompletionsPerAlert": 10
+    },
+    "repeated-ip-attempts": {
+      "ruleName": "repeated-ip-attempts",
+      "checks": [
+        {
+          "type": "trace_check"
+        }
+      ],
+      "logTargetCount": 2,
+      "maxCompletionsPerAlert": 10
     }
   }
 }`,
