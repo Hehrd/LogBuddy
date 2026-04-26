@@ -1,4 +1,6 @@
 <script setup>
+import JsonTree from './JsonTree.vue'
+
 defineProps({
   services: {
     type: Array,
@@ -8,21 +10,10 @@ defineProps({
 
 defineEmits([
   'refresh-service',
-  'run-action',
   'start-query',
   'stop-query',
   'restart-queries',
 ])
-
-function formatJson(value) {
-  if (!value) return ''
-
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
 </script>
 
 <template>
@@ -37,7 +28,7 @@ function formatJson(value) {
           <p class="text-sm font-bold uppercase tracking-normal text-teal">{{ service.label }}</p>
           <h2 class="mt-1 text-2xl font-semibold">Lifecycle</h2>
           <p class="mt-1.5 text-sm text-slate-500">
-            {{ service.loading ? 'Refreshing control-panel state...' : service.error || 'Lifecycle actions are service-specific. Read views come from shared control-panel endpoints.' }}
+            {{ service.loading ? 'Refreshing control-panel state...' : service.error || 'Read views come from shared control-panel endpoints.' }}
           </p>
         </div>
 
@@ -45,38 +36,35 @@ function formatJson(value) {
           <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-ink hover:border-slate-400" @click="$emit('refresh-service', service.key)">
             Refresh
           </button>
-          <button v-for="action in service.actions" :key="action" type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-ink hover:border-slate-400" @click="$emit('run-action', service.key, action)">
-            {{ action }}
-          </button>
         </div>
       </div>
 
       <div class="mt-4 grid gap-4 xl:grid-cols-2">
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 class="text-sm font-semibold text-slate-700">Status</h3>
-          <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.status) || 'No status data' }}</pre>
+          <JsonTree :value="service.status" empty-label="No status data" />
         </div>
 
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 class="text-sm font-semibold text-slate-700">Backend View</h3>
-          <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.config) || 'No backend view available' }}</pre>
+          <JsonTree :value="service.config" empty-label="No backend view available" />
         </div>
 
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 class="text-sm font-semibold text-slate-700">Shared Datasources</h3>
-          <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.dataSources) || 'No datasource data' }}</pre>
+          <JsonTree :value="service.dataSources" empty-label="No datasource data" />
         </div>
 
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 class="text-sm font-semibold text-slate-700">Shared Rules</h3>
-          <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.rules) || 'No rule data' }}</pre>
+          <JsonTree :value="service.rules" empty-label="No rule data" />
         </div>
       </div>
 
       <div v-if="service.key === 'data-processing'" class="mt-4">
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 class="text-sm font-semibold text-slate-700">Stream Metrics</h3>
-          <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.streamMetrics) || 'No stream metrics' }}</pre>
+          <JsonTree :value="service.streamMetrics" empty-label="No stream metrics" />
         </div>
       </div>
 
@@ -103,7 +91,7 @@ function formatJson(value) {
               </div>
             </div>
           </div>
-          <pre v-else class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ formatJson(service.queries) || 'No query data' }}</pre>
+          <JsonTree v-else :value="service.queries" empty-label="No query data" />
         </div>
       </div>
     </article>

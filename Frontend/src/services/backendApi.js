@@ -35,7 +35,6 @@ export async function fetchControlPlaneConfig(service) {
   ])
 
   return {
-    note: 'No dedicated config endpoint is exposed by the backend for this service.',
     basedOn: ['status', 'datasources', 'rules'],
     status,
     dataSources,

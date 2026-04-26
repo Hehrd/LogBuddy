@@ -1,52 +1,39 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
-import { isMockMode } from '../config/runtime.js'
-import { createAlertsConnection, loadAlertHistory } from '../services/alertsService.js'
-import { formatApiError } from '../services/httpClient.js'
+import JsonTree from '../components/JsonTree.vue'
 
-const alerts = ref([])
-const connectionState = ref('Disconnected')
-const connectionError = ref('')
-let alertsConnection = null
-
-const latestAlertTime = computed(() => {
-  if (!alerts.value.length) return 'No alerts yet'
-  return formatDate(alerts.value[0].triggeredAt ?? alerts.value[0].occurredAt ?? alerts.value[0].timestamp)
+const props = defineProps({
+  alerts: {
+    type: Array,
+    required: true,
+  },
+  alertConnectionState: {
+    type: String,
+    required: true,
+  },
+  alertConnectionError: {
+    type: String,
+    default: '',
+  },
 })
 
-async function connectAlerts() {
-  disconnectAlerts()
-  connectionError.value = ''
+defineEmits(['reconnect-alerts'])
 
-  try {
-    const history = await loadAlertHistory()
-    alerts.value = history.slice().reverse()
-  } catch (error) {
-    connectionError.value = formatApiError(error, 'Failed to load alert history.')
-  }
+const route = useRoute()
+const alertsPerPage = 10
+const currentPage = ref(1)
 
-  alertsConnection = createAlertsConnection({
-    onAlert: (alert) => {
-      alerts.value = [alert, ...alerts.value]
-    },
-    onStateChange: (state) => {
-      connectionState.value = state
-    },
-    onError: (message) => {
-      connectionError.value = message
-    },
-  })
+const latestAlertTime = computed(() => {
+  if (!props.alerts.length) return 'No alerts yet'
+  return formatDate(props.alerts[0].triggeredAt ?? props.alerts[0].occurredAt ?? props.alerts[0].timestamp)
+})
 
-  await alertsConnection.connect()
-}
-
-function disconnectAlerts() {
-  if (alertsConnection) {
-    alertsConnection.disconnect()
-    alertsConnection = null
-  }
-}
+const totalPages = computed(() => Math.max(1, Math.ceil(props.alerts.length / alertsPerPage)))
+const pageStart = computed(() => (currentPage.value - 1) * alertsPerPage)
+const pageEnd = computed(() => Math.min(pageStart.value + alertsPerPage, props.alerts.length))
+const visibleAlerts = computed(() => props.alerts.slice(pageStart.value, pageEnd.value))
 
 function formatDate(value) {
   if (!value) return 'Unknown time'
@@ -56,25 +43,60 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
-function formatBoolean(value) {
-  return value ? 'enabled' : 'disabled'
+function alertDetailPayload(alert) {
+  return alert.raw ?? alert
 }
 
-onMounted(connectAlerts)
-onBeforeUnmount(disconnectAlerts)
+function getAlertId(alert) {
+  return alert.alertId ?? alert.id
+}
+
+function isTargetAlert(alert) {
+  return route.query.alert && getAlertId(alert) === route.query.alert
+}
+
+function setCurrentPage(page) {
+  currentPage.value = Math.min(Math.max(page, 1), totalPages.value)
+}
+
+function setPageForAlert(alertId) {
+  const alertIndex = props.alerts.findIndex((alert) => getAlertId(alert) === alertId)
+  if (alertIndex === -1) return
+
+  setCurrentPage(Math.floor(alertIndex / alertsPerPage) + 1)
+}
+
+async function scrollToTargetAlert() {
+  const targetId = route.query.alert
+  if (!targetId) return
+
+  setPageForAlert(targetId)
+  await nextTick()
+  document.getElementById(`alert-${targetId}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+}
+
+onMounted(scrollToTargetAlert)
+
+watch(() => route.query.alert, scrollToTargetAlert)
+watch(totalPages, () => {
+  if (currentPage.value > totalPages.value) setCurrentPage(totalPages.value)
+})
 </script>
 
 <template>
   <section class="grid gap-6">
     <AppHeader
       title="Alerts"
-      :intro="isMockMode ? 'Mock alerts are served through MSW and a simulated live stream.' : 'Live alerts from the data processing websocket will appear here.'"
+      intro="Live alert activity and recent alert payloads."
     />
 
     <section class="grid gap-4 md:grid-cols-3">
       <article class="rounded-lg border border-slate-200 bg-white p-4">
         <span class="text-sm font-semibold text-slate-500">Connection</span>
-        <p class="mt-2 text-2xl font-semibold">{{ connectionState }}</p>
+        <p class="mt-2 text-2xl font-semibold">{{ alertConnectionState }}</p>
       </article>
       <article class="rounded-lg border border-slate-200 bg-white p-4">
         <span class="text-sm font-semibold text-slate-500">Received</span>
@@ -95,21 +117,24 @@ onBeforeUnmount(disconnectAlerts)
         <button
           type="button"
           class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-ink transition-colors hover:border-slate-400"
-          @click="connectAlerts"
+          @click="$emit('reconnect-alerts')"
         >
           Reconnect
         </button>
       </div>
 
-      <p v-if="connectionError" class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-        {{ connectionError }}
+      <p v-if="alertConnectionError" class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        {{ alertConnectionError }}
       </p>
 
-      <div v-if="alerts.length" class="mt-5 grid gap-3">
+      <div v-if="alerts.length" class="mt-5 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
+        <div class="grid gap-3">
         <article
-          v-for="(alert, index) in alerts"
+          v-for="(alert, index) in visibleAlerts"
           :key="`${alert.alertId ?? alert.id ?? alert.triggeredAt ?? index}`"
-          class="rounded-lg border border-slate-200 bg-slate-50 p-4"
+          :id="getAlertId(alert) ? `alert-${getAlertId(alert)}` : undefined"
+          class="rounded-lg border bg-slate-50 p-4 transition-colors"
+          :class="isTargetAlert(alert) ? 'border-teal ring-2 ring-emerald-100' : 'border-slate-200'"
         >
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -121,29 +146,14 @@ onBeforeUnmount(disconnectAlerts)
             </span>
           </div>
 
-          <div class="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-            <p><span class="font-semibold text-ink">Alert id:</span> {{ alert.alertId ?? alert.id ?? 'Unknown' }}</p>
-            <p><span class="font-semibold text-ink">Source:</span> {{ alert.dataSourceName ?? alert.sourceName ?? 'Unknown' }}</p>
-            <p><span class="font-semibold text-ink">Type:</span> {{ alert.alertType ?? 'Unknown' }}</p>
-            <p v-if="alert.traceId"><span class="font-semibold text-ink">Trace:</span> {{ alert.traceId }}</p>
-            <p><span class="font-semibold text-ink">Triggered:</span> {{ formatDate(alert.triggeredAt ?? alert.occurredAt ?? alert.timestamp) }}</p>
-            <p v-if="alert.firstMatchedAt"><span class="font-semibold text-ink">First matched:</span> {{ formatDate(alert.firstMatchedAt) }}</p>
-            <p v-if="alert.lastMatchedAt"><span class="font-semibold text-ink">Last matched:</span> {{ formatDate(alert.lastMatchedAt) }}</p>
-            <p v-if="alert.timeWindowMillis"><span class="font-semibold text-ink">Window:</span> {{ alert.timeWindowMillis }} ms</p>
-            <p><span class="font-semibold text-ink">AI overview:</span> {{ formatBoolean(alert.aiOverviewEnabled) }}</p>
-          </div>
-
-          <div v-if="alert.requiredRules?.length" class="mt-4">
-            <p class="text-sm font-semibold text-ink">Required rules</p>
-            <div class="mt-2 flex flex-wrap gap-1.5">
-              <span
-                v-for="ruleName in alert.requiredRules"
-                :key="ruleName"
-                class="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700"
-              >
-                {{ ruleName }}
-              </span>
-            </div>
+          <div class="mt-4">
+            <p class="text-sm font-semibold text-ink">Alert payload</p>
+            <JsonTree
+              :value="alertDetailPayload(alert)"
+              default-mode="branches"
+              max-height-class="max-h-96"
+              empty-label="No alert payload"
+            />
           </div>
 
           <div v-if="(alert.completions?.length ?? alert.data?.length)" class="mt-4 grid gap-2">
@@ -156,19 +166,66 @@ onBeforeUnmount(disconnectAlerts)
                 <p class="font-semibold">{{ completion?.ruleName ?? 'Unknown rule' }}</p>
                 <p v-if="completion?.timestamp" class="text-xs text-slate-500">{{ formatDate(completion.timestamp) }}</p>
               </div>
-              <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ completion?.logs ?? completion }}</pre>
+              <JsonTree
+                :value="completion?.logs ?? completion"
+                default-mode="none"
+                max-height-class="max-h-72"
+                empty-label="No completion detail"
+              />
             </div>
           </div>
 
           <div v-if="alert.sampleLogs?.length" class="mt-4">
             <p class="text-sm font-semibold text-ink">Sample logs</p>
-            <pre class="mt-2 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ alert.sampleLogs }}</pre>
+            <JsonTree
+              :value="alert.sampleLogs"
+              default-mode="none"
+              max-height-class="max-h-72"
+              empty-label="No sample logs"
+            />
           </div>
-          <pre v-else class="mt-4 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-white">{{ alert.raw ?? alert }}</pre>
         </article>
+        </div>
       </div>
 
-      <div v-else class="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+      <div
+        v-if="alerts.length > alertsPerPage"
+        class="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="text-sm text-slate-500">
+          Showing {{ pageStart + 1 }}-{{ pageEnd }} of {{ alerts.length }} alerts
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-ink hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="currentPage === 1"
+            @click="setCurrentPage(currentPage - 1)"
+          >
+            Previous
+          </button>
+          <button
+            v-for="page in totalPages"
+            :key="page"
+            type="button"
+            class="min-w-10 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors"
+            :class="page === currentPage ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"
+            @click="setCurrentPage(page)"
+          >
+            {{ page }}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-ink hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="currentPage === totalPages"
+            @click="setCurrentPage(currentPage + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div v-if="!alerts.length" class="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
         <h3 class="text-lg font-semibold">No alerts yet</h3>
         <p class="mt-2 text-slate-500">When the backend publishes to the websocket, alerts will show up here.</p>
       </div>

@@ -101,10 +101,22 @@ const mockAlerts = [
   },
 ]
 
+let nextMockAlertId = 1
+
+function createMockAlertId() {
+  const id = `mock-alert-${String(nextMockAlertId).padStart(4, '0')}`
+  nextMockAlertId += 1
+  return id
+}
+
 function enrichAlert(template) {
   const now = new Date().toISOString()
+  const alertId = createMockAlertId()
+
   return {
     ...template,
+    alertId,
+    traceId: `${template.traceId}-${alertId}`,
     triggeredAt: now,
     firstMatchedAt: template.firstMatchedAt ?? now,
     lastMatchedAt: template.lastMatchedAt ?? now,
@@ -139,12 +151,14 @@ export class MockAlertWebSocket extends EventTarget {
     this.sentMessages.push(message)
 
     if (message.includes('ping')) {
+      const alertId = createMockAlertId()
+
       this.emitAlert({
-        alertId: `mock-alert-pong-${Date.now()}`,
+        alertId,
         alertName: 'connection_health',
         alertType: 'HEARTBEAT',
         dataSourceName: 'mock_server',
-        traceId: `trace-${Date.now()}`,
+        traceId: `trace-${alertId}`,
         timeWindowMillis: 60000,
         requiredRules: ['heartbeat'],
         completions: [

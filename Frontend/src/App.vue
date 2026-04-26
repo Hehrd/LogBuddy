@@ -2,8 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import AlertNotifications from './components/AlertNotifications.vue'
-import ControlPlanePanel from './components/ControlPlanePanel.vue'
-import HealthStatusCard from './components/HealthStatusCard.vue'
 import { normalizeAlert } from './services/alertFormatter.js'
 import { createAlertsConnection } from './services/alertsService.js'
 import { formatApiError } from './services/httpClient.js'
@@ -26,8 +24,10 @@ function extractQueryNames(queriesPayload) {
   return Object.keys(queriesPayload ?? {})
 }
 
-const notificationSocket = ref(null)
-const notificationAlerts = ref([])
+const alertsConnection = ref(null)
+const alerts = ref([])
+const alertConnectionState = ref('Disconnected')
+const alertConnectionError = ref('')
 const notificationsOpen = ref(false)
 const health = ref(null)
 const healthLoading = ref(true)
@@ -42,7 +42,6 @@ const controlPlaneServices = ref([
     config: null,
     dataSources: null,
     rules: null,
-    actions: ['sleep', 'wake', 'restart', 'shutdown'],
     queries: null,
     queryNames: [],
     streamMetrics: null,
@@ -56,20 +55,46 @@ const controlPlaneServices = ref([
     config: null,
     dataSources: null,
     rules: null,
-    actions: ['sleep', 'wake', 'restart', 'shutdown'],
     queries: null,
     queryNames: [],
     streamMetrics: null,
   },
 ])
 
-const alertsMode = computed(() => {
-  const mode = import.meta.env.VITE_ALERTS_MODE?.toLowerCase()
-  if (mode === 'mock' || mode === 'real') {
-    return mode
+const maxCachedAlerts = 100
+const notificationAlerts = computed(() => alerts.value.map((alert) => normalizeAlert(alert)))
+
+function getAlertId(alert) {
+  return alert.alertId ?? alert.id
+}
+
+function getAlertTime(alert) {
+  const rawTime = alert.triggeredAt ?? alert.occurredAt ?? alert.timestamp ?? alert.rawAlert?.triggeredAt
+  const parsed = rawTime ? new Date(rawTime).getTime() : 0
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function setOrderedAlerts(nextAlerts) {
+  const byId = new Map()
+
+  for (const alert of nextAlerts) {
+    const alertId = getAlertId(alert)
+    if (!alertId) continue
+
+    const existing = byId.get(alertId)
+    if (!existing || getAlertTime(alert) >= getAlertTime(existing)) {
+      byId.set(alertId, alert)
+    }
   }
-  return import.meta.env.DEV ? 'mock' : 'real'
-})
+
+  alerts.value = [...byId.values()]
+    .sort((left, right) => getAlertTime(right) - getAlertTime(left))
+    .slice(0, maxCachedAlerts)
+}
+
+function addAlert(alert) {
+  setOrderedAlerts([alert, ...alerts.value])
+}
 
 async function loadHealth() {
   healthLoading.value = true
@@ -116,19 +141,25 @@ async function refreshControlPlaneService(serviceKey) {
   }
 }
 
-async function runServiceAction(serviceKey, action) {
-  const service = getServiceState(serviceKey)
-  if (!service) return
+async function runAllServicesAction(action) {
+  const services = controlPlaneServices.value
 
-  service.error = ''
-
-  try {
-    await runControlPlaneAction(serviceKey, action)
-    await refreshControlPlaneService(serviceKey)
-    await loadHealth()
-  } catch (error) {
-    service.error = formatApiError(error, `Failed to run ${action} on ${service.label}.`)
+  for (const service of services) {
+    service.error = ''
   }
+
+  await Promise.all(
+    services.map(async (service) => {
+      try {
+        await runControlPlaneAction(service.key, action)
+        await refreshControlPlaneService(service.key)
+      } catch (error) {
+        service.error = formatApiError(error, `Failed to run ${action} on ${service.label}.`)
+      }
+    }),
+  )
+
+  await loadHealth()
 }
 
 async function startSparkQuery(dataSource) {
@@ -169,21 +200,23 @@ async function restartSparkQueries() {
   }
 }
 
-function connectNotificationSocket() {
-  notificationSocket.value?.disconnect?.()
+function connectAlerts() {
+  alertsConnection.value?.disconnect?.()
+  alertConnectionError.value = ''
 
-  notificationSocket.value = createAlertsConnection({
+  alertsConnection.value = createAlertsConnection({
     onAlert: (alert) => {
-      notificationAlerts.value = [
-        normalizeAlert(alert),
-        ...notificationAlerts.value,
-      ]
+      addAlert(alert)
     },
-    onStateChange: () => {},
-    onError: () => {},
+    onStateChange: (state) => {
+      alertConnectionState.value = state
+    },
+    onError: (message) => {
+      alertConnectionError.value = message
+    },
   })
 
-  notificationSocket.value.connect()
+  alertsConnection.value.connect()
 }
 
 function toggleNotifications() {
@@ -191,7 +224,7 @@ function toggleNotifications() {
 }
 
 function clearNotifications() {
-  notificationAlerts.value = []
+  alerts.value = []
 }
 
 function closeNotifications() {
@@ -202,11 +235,11 @@ onMounted(() => {
   loadHealth()
   refreshControlPlaneService('data-processing')
   refreshControlPlaneService('spark')
-  connectNotificationSocket()
+  connectAlerts()
 })
 
 onBeforeUnmount(() => {
-  notificationSocket.value?.disconnect?.()
+  alertsConnection.value?.disconnect?.()
 })
 </script>
 
@@ -230,6 +263,13 @@ onBeforeUnmount(() => {
           Config
         </RouterLink>
         <RouterLink
+          to="/info"
+          class="rounded-lg border px-4 py-2 transition-colors"
+          :class="$route.path.startsWith('/info') ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"
+        >
+          Info
+        </RouterLink>
+        <RouterLink
           to="/alerts"
           class="rounded-lg border px-4 py-2 transition-colors"
           :class="$route.path === '/alerts' ? 'border-teal bg-emerald-50 text-ink' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'"
@@ -241,6 +281,7 @@ onBeforeUnmount(() => {
           :open="notificationsOpen"
           @toggle="toggleNotifications"
           @clear="clearNotifications"
+          @close="closeNotifications"
         />
       </nav>
     </header>
@@ -253,18 +294,20 @@ onBeforeUnmount(() => {
       @click="closeNotifications"
     />
 
-    <HealthStatusCard :health="health" :loading="healthLoading" :error="healthError" class="mb-6" />
-
-    <ControlPlanePanel
+    <RouterView
       :services="controlPlaneServices"
-      class="mb-6"
+      :health="health"
+      :health-loading="healthLoading"
+      :health-error="healthError"
+      :alerts="alerts"
+      :alert-connection-state="alertConnectionState"
+      :alert-connection-error="alertConnectionError"
       @refresh-service="refreshControlPlaneService"
-      @run-action="runServiceAction"
+      @run-all-action="runAllServicesAction"
       @start-query="startSparkQuery"
       @stop-query="stopSparkQuery"
       @restart-queries="restartSparkQueries"
+      @reconnect-alerts="connectAlerts"
     />
-
-    <RouterView />
   </main>
 </template>
